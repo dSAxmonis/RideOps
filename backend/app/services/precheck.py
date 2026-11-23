@@ -9,6 +9,7 @@ from app.domain.models import (
     OUTCOME_DUPLICATE,
     PRIORITY_P1,
     ConfidenceBand,
+    PrecheckMode,
     TriageView,
     Verdict,
 )
@@ -39,7 +40,7 @@ class Rule(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class PrecheckPolicy:
-    version: str = "2026-11.v2"
+    version: str = "2026-11.v3"
     similarity_floor: float = 0.5
     shrinkage: float = 5.0
     min_category_history: int = 10
@@ -48,10 +49,14 @@ class PrecheckPolicy:
     l1_fix_threshold: float = 0.4
     top_k: int = 5
     l1_fix_holds: bool = False
+    # History can warn but cannot separate true bugs well enough to delay one.
+    history_holds: bool = False
 
 
 DEFAULT_POLICY = PrecheckPolicy()
-ORIGINAL_POLICY = PrecheckPolicy(version="2026-11.v1", l1_fix_holds=True)
+HISTORY_HOLD_POLICY = PrecheckPolicy(version="2026-11.v2", history_holds=True)
+ORIGINAL_POLICY = PrecheckPolicy(version="2026-11.v1", l1_fix_holds=True, history_holds=True)
+ENFORCE_NOTE = "Enforce mode: add the missing proof, or record a reason to escalate now."
 L1_HINT = (
     "Hint (non-blocking): similar prior escalations were often config or how-to issues; "
     "a quick L1 check may help."
@@ -87,6 +92,8 @@ class PrecheckResult:
     suggested_action: str
     known_issue: KnownIssue | None
     playbook: Playbook
+    mode: PrecheckMode = PrecheckMode.MONITOR
+    escalation_gated: bool = False
     override_allowed: bool = True
 
 
@@ -157,6 +164,11 @@ def decide(
     return Verdict.READY_TO_ESCALATE, Rule.NO_HOLD_SIGNAL
 
 
+def is_escalation_gated(priority: str, missing_keys: list[str] | None, mode: PrecheckMode) -> bool:
+    """Only missing proof can gate, only in enforce mode, and never on a P1."""
+    return mode is PrecheckMode.ENFORCE and priority != PRIORITY_P1 and bool(missing_keys)
+
+
 def confidence_band(signals: Signals) -> ConfidenceBand:
     if signals.match_total >= 5 and signals.top_similarity >= 0.8 and signals.category_total >= 20:
         return ConfidenceBand.HIGH
@@ -201,6 +213,7 @@ def run_precheck(
     knowledge: KnowledgeBase,
     policy: PrecheckPolicy = DEFAULT_POLICY,
     note: str | None = None,
+    mode: PrecheckMode = PrecheckMode.MONITOR,
 ) -> PrecheckResult:
     if evidence is None:
         checklist = [blank_state(item) for item in items_for(view.category)]
@@ -240,6 +253,9 @@ def run_precheck(
         )
     if note:
         reasons.append("Agent note received; it is not used in scoring.")
+    escalation_gated = is_escalation_gated(view.priority, missing_keys, mode)
+    if escalation_gated:
+        reasons.insert(1, ENFORCE_NOTE)
 
     return PrecheckResult(
         ticket_id=view.ticket_id,
@@ -252,4 +268,6 @@ def run_precheck(
         suggested_action=suggested_action,
         known_issue=known_issue,
         playbook=PLAYBOOKS[view.category],
+        mode=mode,
+        escalation_gated=escalation_gated,
     )

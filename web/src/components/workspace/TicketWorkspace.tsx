@@ -112,6 +112,7 @@ function CheckColumn({ ticket }: { ticket: Ticket }) {
     <DecisionBar
       priority={ticket.priority}
       verdict={verdict}
+      gated={precheck.isError ? undefined : precheck.data?.escalation_gated}
       evidence={evidence}
       checking={precheck.isFetching || evidencePending}
       submitting={decision.isPending}
@@ -125,7 +126,11 @@ function CheckColumn({ ticket }: { ticket: Ticket }) {
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-2">
         <h2 className="text-sm font-semibold">Pre-Escalation Check</h2>
-        <p className="text-xs text-ink-2">Advisory only. You decide, and can always escalate.</p>
+        <p className="text-xs text-ink-2">
+          {precheck.data?.mode === "enforce"
+            ? "Enforce: missing proof needs a logged reason. P1s are never gated."
+            : "Monitor: advice is logged and nothing is gated."}
+        </p>
       </div>
 
       {fastPath ? <P1FastPath /> : null}

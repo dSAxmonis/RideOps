@@ -23,13 +23,16 @@ export function sortQueue<T extends Pick<TicketSummary, "priority" | "created_at
   );
 }
 
-/** A reason is required when escalating against a non-ready verdict, except on P1. */
+/** The server's gate decides when known; P1s never need a reason. */
 export function requiresOverrideReason(
   action: DecisionAction,
   verdict: Verdict | null,
   priority: string,
+  gated?: boolean,
 ) {
-  return action === "escalated" && verdict !== "ready_to_escalate" && !isP1(priority);
+  if (action !== "escalated" || isP1(priority)) return false;
+  if (verdict === null) return true;
+  return gated ?? verdict !== "ready_to_escalate";
 }
 
 export const isTicketClosed = (status: string) => /clos|resolv/i.test(status);

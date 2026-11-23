@@ -14,6 +14,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
 class DecisionActivity(Protocol):
     action: str
     server_verdict: str
+    override_reason: str | None
     created_at: datetime
 
 
@@ -36,7 +37,8 @@ def build_live_metrics(
     rows = list(decisions)
     by_action = Counter(row.action for row in rows)
     held = [row for row in rows if row.server_verdict != Verdict.READY_TO_ESCALATE.value]
-    overrides = sum(row.action == DecisionAction.ESCALATED.value for row in held)
+    escalated_held = [row for row in held if row.action == DecisionAction.ESCALATED.value]
+    overrides = sum(bool(row.override_reason) for row in escalated_held)
     lane_counts = Counter(lane_for(ticket) for ticket in cleared_tickets)
     decisions_by_day = Counter(_day(row.created_at) for row in rows)
     cleared_by_day = Counter(
@@ -51,7 +53,7 @@ def build_live_metrics(
         "by_action": {action.value: by_action[action.value] for action in DecisionAction},
         "overrides": overrides,
         "override_rate": round(overrides / len(held), 4) if held else 0.0,
-        "escalations_avoided": len(held) - overrides,
+        "escalations_avoided": len(held) - len(escalated_held),
         "by_lane_cleared": {lane.lane: lane_counts[lane.lane] for lane in LANES},
         "by_day": [
             {
