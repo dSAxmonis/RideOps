@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from app.domain.checklists import MAX_PROOF_CHARS
-from app.domain.models import ConfidenceBand, DecisionAction, Verdict
+from app.domain.models import ConfidenceBand, DecisionAction, PrecheckMode, Verdict
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 LongText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
@@ -98,6 +98,8 @@ class PrecheckResponse(BaseModel):
     suggested_action: str
     known_issue: KnownIssueRef | None
     playbook: PlaybookView
+    mode: PrecheckMode
+    escalation_gated: bool
     override_allowed: Literal[True] = True
 
 
