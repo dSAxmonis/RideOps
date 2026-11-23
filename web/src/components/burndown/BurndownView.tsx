@@ -16,6 +16,7 @@ import type { BacklogAction, Burndown, BurndownItem } from "@/lib/contract";
 import { useAgentName } from "@/lib/useAgentName";
 import { Icon } from "@/components/Icon";
 import { PriorityBadge } from "@/components/PriorityBadge";
+import { Select } from "@/components/Select";
 import { EmptyNotice, LoadingRows, QueryBoundary, buttonClass, primaryButtonClass } from "@/components/QueryStates";
 
 const QUERY_KEY = ["burndown"];
@@ -23,7 +24,7 @@ const MUTATION_KEY = ["backlog-action"];
 const PAGE_SIZE = 7;
 const FEATURED_LANES = ["confirm_fix", "get_info", "apply_config", "l1_triage"];
 const GRID =
-  "lg:grid lg:grid-cols-[3rem_minmax(0,1.7fr)_minmax(0,1.2fr)_3rem_6.5rem_7.5rem] lg:items-center lg:gap-3";
+  "lg:grid lg:grid-cols-[3.5rem_minmax(0,2.6fr)_minmax(0,1fr)_4rem_7rem_8rem] lg:items-center lg:gap-3";
 const ACTION_LABEL: Record<BacklogAction, string> = {
   cleared: "Clear",
   waiting_client: "Waiting on client",
@@ -40,7 +41,7 @@ const STATE_AFTER: Record<BacklogAction, string> = {
   reopened: "reopened",
 };
 const VERDICT_CHIP: Record<string, { label: string; tone: string }> = {
-  Fixed: { label: "Fixed", tone: "bg-good-soft text-good" },
+  Fixed: { label: "Fixed", tone: "bg-accent text-accent-ink" },
   "Insufficient info - returned to L1": { label: "Needs info", tone: "bg-serious-soft text-serious-text" },
   "Config issue - returned to L1": { label: "Config", tone: "bg-serious-soft text-serious-text" },
   "Duplicate of known issue": { label: "Duplicate", tone: "bg-serious-soft text-serious-text" },
@@ -240,7 +241,7 @@ function BacklogStatus({ data, waiting }: { data: Burndown; waiting: number }) {
   const segments = [
     { label: "Fixed", value: fixed, bar: "bg-teal" },
     { label: "Other verdict", value: otherVerdict, bar: "bg-warning" },
-    { label: "No verdict", value: noVerdict, bar: "bg-serious" },
+    { label: "No verdict", value: noVerdict, bar: "bg-pale" },
   ];
   return (
     <section aria-label="Backlog status" className="card space-y-4">
@@ -284,9 +285,9 @@ function DayOneCard({ data, waiting }: { data: Burndown; waiting: number }) {
   const fixed = data.items.filter((item) => !isCleared(item) && item.eng_outcome === "Fixed").length;
   const percent = data.open_now > 0 ? Math.round((waiting / data.open_now) * 100) : 0;
   return (
-    <section aria-label="Day-1 opportunity" className="hero-card">
+    <section aria-label="Day-1 opportunity" className="hero-card flex flex-col">
       <h2 className="card-title">Day-1 Opportunity</h2>
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
+      <div className="mt-4 flex flex-1 flex-wrap items-center justify-center gap-4">
         <div className="relative h-40 w-40 shrink-0">
           <RingGauge percent={percent} />
           <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -361,9 +362,9 @@ function BurndownContent({ data }: { data: Burndown }) {
         </Link>
       </div>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="min-w-0 space-y-4">
-          <div role="group" aria-label="Filter by lane" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="space-y-4">
+        <div className="grid items-stretch gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)]">
+          <div role="group" aria-label="Filter by lane" className="grid grid-cols-2 gap-4 lg:col-span-2 lg:grid-cols-4 xl:col-span-1 xl:grid-cols-2">
             {featured.map((lane) => {
               const active = activeLane === lane.lane;
               return (
@@ -372,15 +373,15 @@ function BurndownContent({ data }: { data: Burndown }) {
                   type="button"
                   aria-pressed={active}
                   onClick={() => setLane(active ? null : lane.lane)}
-                  className={`card text-left transition hover:shadow-md ${active ? "ring-2 ring-accent" : ""}`}
+                  className={`card text-left transition hover:shadow-md ${active ? "bg-serious-soft ring-2 ring-accent" : ""}`}
                 >
                   <span className="flex items-start justify-between">
-                    <Icon name="folder" className={`h-9 w-9 ${active ? "text-accent" : "text-ink-3"}`} />
+                    <Icon name="folder" className="h-9 w-9 text-accent" />
                     <span className="icon-tile">
                       <Icon name="arrow" />
                     </span>
                   </span>
-                  <span className="mt-6 block font-medium">{lane.label}</span>
+                  <span className="mt-4 block font-medium">{lane.label}</span>
                   <span className="block text-ink-2 tabular-nums">
                     {lane.count} {lane.count === 1 ? "ticket" : "tickets"}
                   </span>
@@ -388,6 +389,9 @@ function BurndownContent({ data }: { data: Burndown }) {
               );
             })}
           </div>
+          <BacklogStatus data={data} waiting={waiting} />
+          <DayOneCard data={data} waiting={waiting} />
+        </div>
 
           <section aria-label="Backlog" className="card">
             <div className="flex flex-wrap items-center gap-2">
@@ -400,19 +404,15 @@ function BurndownContent({ data }: { data: Burndown }) {
                 All <span className="tabular-nums">{data.open_now}</span>
               </button>
               {otherLanes.length > 0 ? (
-                <select
-                  aria-label="Other lanes"
+                <Select
+                  label="Other lanes"
                   value={otherLanes.some((lane) => lane.lane === activeLane) ? (activeLane ?? "") : ""}
-                  onChange={(event) => setLane(event.target.value || null)}
-                  className="h-10 rounded-xl border border-line bg-surface px-3"
-                >
-                  <option value="">More lanes</option>
-                  {otherLanes.map((lane) => (
-                    <option key={lane.lane} value={lane.lane}>
-                      {lane.label} ({lane.count})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setLane(value || null)}
+                  options={[
+                    { value: "", label: "More lanes" },
+                    ...otherLanes.map((lane) => ({ value: lane.lane, label: `${lane.label} (${lane.count})` })),
+                  ]}
+                />
               ) : null}
               <div className="flex min-w-0 basis-full items-center justify-end gap-2 sm:flex-1 sm:basis-auto">
                 <label htmlFor="burndown-agent" className="shrink-0 text-[13px] text-ink-2">Acting as</label>
@@ -481,12 +481,6 @@ function BurndownContent({ data }: { data: Burndown }) {
               </div>
             )}
           </section>
-        </div>
-
-        <aside className="space-y-4">
-          <BacklogStatus data={data} waiting={waiting} />
-          <DayOneCard data={data} waiting={waiting} />
-        </aside>
       </div>
     </div>
   );
