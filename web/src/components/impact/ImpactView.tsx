@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import { fetchBacktest, fetchWeekly } from "@/lib/api";
-import type { Backtest, BacktestValue, WeekMetrics } from "@/lib/contract";
+import type { Backtest, BacktestRun, WeekMetrics } from "@/lib/contract";
 import { formatRate, humanize, toPercentSeries } from "@/lib/domain";
 import { Icon } from "@/components/Icon";
 import { EmptyNotice, QueryBoundary } from "@/components/QueryStates";
@@ -164,81 +164,130 @@ function Stat({
   );
 }
 
-const notReported = <span className="text-sm font-normal text-ink-2">Not reported</span>;
+const RESULT_LABELS: Record<string, string> = {
+  revised_not_clean_holdout: "Revised policy: not a clean holdout",
+  original_pre_change: "Original replay, before the revision",
+};
 
-function precisionValue(value: BacktestValue | null) {
-  if (value === null) return notReported;
-  if (typeof value === "number") return formatRate(value);
-  return (
-    <span className="block text-[13px] font-normal">
-      {Object.entries(value).map(([key, rate]) => (
-        <span key={key} className="flex justify-between gap-2">
-          <span className="text-ink-2">{humanize(key)}</span>
-          <span>{formatRate(rate)}</span>
-        </span>
-      ))}
-    </span>
-  );
-}
+const resultLabel = (label: string) => RESULT_LABELS[label] ?? humanize(label);
+const KNOWN_ISSUE = "likely_known_issue";
+const rate = (value: number | null | undefined) => formatRate(value ?? null);
+const plain = (value: number | null | undefined) => (value === null || value === undefined ? "n/a" : String(value));
+const ofTotal = (value: number | undefined, total: number | null | undefined) =>
+  value === undefined ? "n/a" : total === null || total === undefined ? String(value) : `${value} of ${total}`;
+const lift = (value: number | null | undefined) =>
+  value === null || value === undefined ? "n/a" : `${value.toFixed(1)}x`;
+
+const COMPARISON: { label: string; value: (run: BacktestRun) => string }[] = [
+  { label: "Escalations replayed", value: (run) => plain(run.escalations) },
+  {
+    label: "Fixed bugs delayed",
+    value: (run) => ofTotal(run.fixed_bugs_delayed?.count, run.fixed_bugs_delayed?.fixed_total),
+  },
+  { label: "Fixed bugs delayed, rate", value: (run) => rate(run.fixed_bugs_delayed?.rate) },
+  { label: "P1 misses", value: (run) => ofTotal(run.p1?.misses, run.p1?.total) },
+  { label: "Known-issue precision", value: (run) => rate(run.precision_by_verdict[KNOWN_ISSUE]?.precision) },
+  { label: "Known-issue base rate", value: (run) => rate(run.precision_by_verdict[KNOWN_ISSUE]?.base_rate) },
+  { label: "Known-issue lift", value: (run) => lift(run.precision_by_verdict[KNOWN_ISSUE]?.lift) },
+  { label: "Held for review", value: (run) => plain(run.held_for_review?.count) },
+  { label: "Avoidable caught", value: (run) => plain(run.held_for_review?.avoidable) },
+  { label: "Share of avoidable caught", value: (run) => rate(run.held_for_review?.recall_avoidable) },
+  { label: "Precision of holds (avoidable)", value: (run) => rate(run.held_for_review?.precision_avoidable) },
+];
+
+const windowText = (run: BacktestRun) =>
+  run.window ? `${run.window.start.slice(0, 10)} to ${run.window.end.slice(0, 10)}` : "n/a";
 
 export function BacktestResults({ data }: { data: Backtest }) {
-  const counts = Object.entries(data.verdictCounts ?? {});
-  const totalCount = counts.reduce((sum, [, value]) => sum + value, 0);
-  const extras = Object.entries(data.extras);
+  const original = data.original_pre_change ?? null;
+  const knownIssue = data.precision_by_verdict[KNOWN_ISSUE];
+  const delayed = data.fixed_bugs_delayed;
+  const runs: { heading: string; run: BacktestRun }[] = [
+    { heading: resultLabel(data.result_label), run: data },
+    ...(original ? [{ heading: resultLabel(original.result_label), run: original }] : []),
+  ];
+  const verdictKeys = [...new Set(runs.flatMap(({ run }) => Object.keys(run.flagged_by_verdict)))];
   return (
     <div className="space-y-2">
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div role="note" className="border-l-2 border-warning bg-surface px-3 py-2">
+        <p className="flex items-center gap-1.5 text-[15px] font-semibold">
+          <Icon name="alert" className="text-warning" />
+          {resultLabel(data.result_label)}
+        </p>
+        <p className="mt-0.5">{data.methodology_note}</p>
+        <p className="mt-1 text-xs text-ink-2">
+          Window {windowText(data)}. Policy {data.policy_version ?? "n/a"}.
+          {data.clean_holdout ? "" : " Do not read this as a clean holdout."}
+        </p>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
-          label="True bugs that would be delayed"
-          value={data.trueBugsDelayed ?? notReported}
-          note="Real bugs the check would have advised holding. This is the cost of the tool."
-          flagged={(data.trueBugsDelayed ?? 0) > 0}
+          label="Fixed bugs delayed"
+          value={ofTotal(delayed?.count, delayed?.fixed_total)}
+          note={`Real bugs the check would have held (${rate(delayed?.rate)}). This is the cost of the tool.`}
+          flagged={(delayed?.count ?? 0) > 0}
         />
         <Stat
           label="P1 misses"
-          value={data.p1Misses ?? notReported}
+          value={ofTotal(data.p1?.misses, data.p1?.total)}
           note="P1s given anything other than the fast path. The target is 0."
-          flagged={(data.p1Misses ?? 0) > 0}
+          flagged={(data.p1?.misses ?? 0) > 0}
         />
         <Stat
-          label="Precision"
-          value={precisionValue(data.precision)}
-          note="When it advised holding, how often that was right."
+          label="Known-issue precision"
+          value={rate(knownIssue?.precision)}
+          note={`${lift(knownIssue?.lift)} lift over a ${rate(knownIssue?.base_rate)} base rate.`}
+        />
+        <Stat
+          label="Avoidable caught"
+          value={ofTotal(data.held_for_review?.avoidable, data.held_for_review?.count)}
+          note={`Of tickets held. ${rate(data.held_for_review?.recall_avoidable)} of all avoidable escalations.`}
         />
       </div>
-      <div className="grid gap-2 lg:grid-cols-2">
-        <div className="border border-line bg-surface p-3">
-          <h3 className="mb-1 text-xs font-semibold text-ink-2">Verdicts on past tickets</h3>
-          {counts.length === 0 ? <p className="text-ink-2">Not reported</p> : (
-            <table className="w-full text-[13px] tabular-nums">
-              <tbody>
-                {counts.map(([key, value]) => (
-                  <tr key={key} className="border-b border-line last:border-b-0">
-                    <th scope="row" className="py-1 text-left font-normal">{humanize(key)}</th>
-                    <td className="py-1 text-right">{value}</td>
-                    <td className="w-16 py-1 text-right text-ink-2">
-                      {totalCount > 0 ? `${((value / totalCount) * 100).toFixed(0)}%` : "n/a"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-        {extras.length > 0 ? (
-          <div className="border border-line bg-surface p-3">
-            <h3 className="mb-1 text-xs font-semibold text-ink-2">Other reported figures</h3>
-            <dl className="text-[13px] tabular-nums">
-              {extras.map(([key, value]) => (
-                <div key={key} className="flex justify-between border-b border-line py-1 last:border-b-0">
-                  <dt>{humanize(key)}</dt>
-                  <dd>{value}</dd>
-                </div>
+
+      <div className="overflow-x-auto border border-line bg-surface">
+        <table className="w-full min-w-[520px] text-right text-[13px] tabular-nums">
+          <caption className="px-3 pt-2 text-left text-xs font-semibold text-ink-2">Revised versus original</caption>
+          <thead>
+            <tr className="border-b border-line text-xs text-ink-2">
+              <th scope="col" className="px-3 py-1 text-left font-medium">Measure</th>
+              {runs.map(({ heading }) => (
+                <th key={heading} scope="col" className="px-3 py-1 font-medium">{heading}</th>
               ))}
-            </dl>
-          </div>
-        ) : null}
+            </tr>
+          </thead>
+          <tbody>
+            {COMPARISON.map((row) => (
+              <tr key={row.label} className="border-b border-line last:border-b-0">
+                <th scope="row" className="px-3 py-1 text-left font-normal">{row.label}</th>
+                {runs.map(({ heading, run }) => (
+                  <td key={heading} className="px-3 py-1">{row.value(run)}</td>
+                ))}
+              </tr>
+            ))}
+            {verdictKeys.map((key) => (
+              <tr key={key} className="border-b border-line last:border-b-0">
+                <th scope="row" className="px-3 py-1 text-left font-normal">Flagged: {humanize(key)}</th>
+                {runs.map(({ heading, run }) => (
+                  <td key={heading} className="px-3 py-1">{plain(run.flagged_by_verdict[key])}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+
+      {data.assumptions.length > 0 ? (
+        <div className="border border-line bg-surface px-3 py-2">
+          <h3 className="mb-1 text-xs font-semibold text-ink-2">Assumptions</h3>
+          <ul className="list-disc space-y-0.5 pl-4">
+            {data.assumptions.map((assumption) => (
+              <li key={assumption}>{assumption}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

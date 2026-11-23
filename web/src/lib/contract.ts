@@ -7,6 +7,7 @@ import { z } from "zod";
 const nullableString = z.string().nullish().transform((value) => value ?? null);
 const nullableNumber = z.number().nullish().transform((value) => value ?? null);
 
+/** `try_l1_fix` is no longer emitted but stays parseable for older records. */
 export const VERDICTS = [
   "likely_known_issue",
   "try_l1_fix",
@@ -46,8 +47,18 @@ export const ticketListSchema = z.object({
 });
 export type TicketList = z.infer<typeof ticketListSchema>;
 
-/** The contract does not enumerate detail-only fields, so extras are retained. */
-export const ticketSchema = ticketSummarySchema;
+/** Post-triage fields are null while a ticket is open. */
+export const ticketSchema = ticketSummarySchema.extend({
+  client_id: nullableString,
+  first_response_at: nullableString,
+  eng_ticket_id: nullableString,
+  eng_handoffs: nullableNumber,
+  eng_outcome: nullableString,
+  first_closed_at: nullableString,
+  final_closed_at: nullableString,
+  reopen_count: nullableNumber,
+  csat_score: nullableNumber,
+});
 export type Ticket = z.infer<typeof ticketSchema>;
 
 export const checklistItemSchema = z.object({
@@ -89,6 +100,8 @@ export interface DecisionRequest {
   action: DecisionAction;
   /** Null only when the check could not be loaded, so no verdict was shown. */
   verdict_shown: Verdict | null;
+  /** The server recomputes the verdict from this map. */
+  evidence: Record<string, boolean>;
   override_reason?: string;
   agent: string;
 }
@@ -113,77 +126,48 @@ export type WeekMetrics = z.infer<typeof weekSchema>;
 export const weeklyMetricsSchema = z.object({ weeks: z.array(weekSchema) });
 export type WeeklyMetrics = z.infer<typeof weeklyMetricsSchema>;
 
-/** Scalar or per-verdict value, as the backtest payload shape is not fixed. */
-export type BacktestValue = number | Record<string, number>;
-
-export interface Backtest {
-  verdictCounts: Record<string, number> | null;
-  precision: BacktestValue | null;
-  trueBugsDelayed: number | null;
-  p1Misses: number | null;
-  /** Numeric fields the UI has no dedicated slot for, shown rather than dropped. */
-  extras: Record<string, number>;
-}
-
-const BACKTEST_ALIASES = {
-  verdictCounts: ["verdict_counts", "verdicts", "counts", "counts_by_verdict"],
-  precision: ["precision", "known_issue_precision", "hold_precision", "precision_by_verdict"],
-  trueBugsDelayed: ["true_bugs_delayed", "true_bugs_held", "bugs_delayed", "delayed_true_bugs"],
-  p1Misses: ["p1_misses", "p1_missed", "p1_miss_count", "p1_held"],
-} as const;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const isFiniteNumber = (value: unknown): value is number =>
-  typeof value === "number" && Number.isFinite(value);
-
-function numericRecord(value: unknown): Record<string, number> | null {
-  if (!isRecord(value)) return null;
-  const entries = Object.entries(value).filter((entry): entry is [string, number] =>
-    isFiniteNumber(entry[1]),
-  );
-  return entries.length > 0 ? Object.fromEntries(entries) : null;
-}
-
-function countFrom(value: unknown): number | null {
-  if (isFiniteNumber(value)) return value;
-  if (isRecord(value) && isFiniteNumber(value.count)) return value.count;
-  return null;
-}
-
-function firstKey(source: Record<string, unknown>, keys: readonly string[]) {
-  return keys.find((key) => source[key] !== undefined && source[key] !== null);
-}
-
-/**
- * Tolerant by design: missing fields stay null so the UI reports them as
- * "not reported" and never implies a zero the backend did not state.
- */
-export const backtestSchema = z.unknown().transform((input, ctx): Backtest => {
-  if (!isRecord(input)) {
-    ctx.addIssue({ code: "custom", message: "Backtest payload must be an object" });
-    return z.NEVER;
-  }
-  const source = isRecord(input.backtest) ? input.backtest : input;
-  const consumed = new Set<string>();
-  const take = (keys: readonly string[]) => {
-    const key = firstKey(source, keys);
-    if (key === undefined) return undefined;
-    consumed.add(key);
-    return source[key];
-  };
-
-  const rawPrecision = take(BACKTEST_ALIASES.precision);
-  const backtest: Backtest = {
-    verdictCounts: numericRecord(take(BACKTEST_ALIASES.verdictCounts)),
-    precision: isFiniteNumber(rawPrecision) ? rawPrecision : numericRecord(rawPrecision),
-    trueBugsDelayed: countFrom(take(BACKTEST_ALIASES.trueBugsDelayed)),
-    p1Misses: countFrom(take(BACKTEST_ALIASES.p1Misses)),
-    extras: {},
-  };
-  for (const [key, value] of Object.entries(source)) {
-    if (!consumed.has(key) && isFiniteNumber(value)) backtest.extras[key] = value;
-  }
-  return backtest;
+const backtestVerdictSchema = z.looseObject({
+  flagged: z.number(),
+  correct: z.number(),
+  precision: nullableNumber,
+  base_rate: nullableNumber,
+  lift: nullableNumber,
+  target_outcomes: z.array(z.string()).default([]),
 });
+
+const backtestRunSchema = z.looseObject({
+  window: z.looseObject({ start: z.string(), end: z.string() }).nullish(),
+  policy_version: nullableString,
+  escalations: nullableNumber,
+  flagged_by_verdict: z.record(z.string(), z.number()).default({}),
+  precision_by_verdict: z.record(z.string(), backtestVerdictSchema).default({}),
+  held_for_review: z
+    .looseObject({
+      count: z.number(),
+      avoidable: z.number(),
+      precision_avoidable: nullableNumber,
+      base_rate_avoidable: nullableNumber,
+      recall_avoidable: nullableNumber,
+    })
+    .nullish(),
+  fixed_bugs_delayed: z
+    .looseObject({
+      count: z.number(),
+      fixed_total: nullableNumber,
+      rate: nullableNumber,
+      by_verdict: z.record(z.string(), z.number()).default({}),
+    })
+    .nullish(),
+  p1: z.looseObject({ total: nullableNumber, misses: z.number() }).nullish(),
+  assumptions: z.array(z.string()).default([]),
+  // Required: a result without its label must not render as a plain result.
+  result_label: z.string().min(1),
+  clean_holdout: z.boolean(),
+});
+export type BacktestRun = z.infer<typeof backtestRunSchema>;
+
+export const backtestSchema = backtestRunSchema.extend({
+  methodology_note: z.string().min(1),
+  original_pre_change: backtestRunSchema.nullish(),
+});
+export type Backtest = z.infer<typeof backtestSchema>;

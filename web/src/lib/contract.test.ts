@@ -3,6 +3,8 @@ import {
   backtestSchema,
   precheckResponseSchema,
   ticketListSchema,
+  ticketSchema,
+  verdictSchema,
   weeklyMetricsSchema,
 } from "@/lib/contract";
 
@@ -18,6 +20,25 @@ const ticket = {
   assigned_agent: null,
   status: "open",
   escalated_to_eng: false,
+};
+
+const run = {
+  escalations: 10,
+  flagged_by_verdict: { needs_info: 1 },
+  precision_by_verdict: {
+    needs_info: { flagged: 1, correct: 0, precision: null, base_rate: 0.1, lift: null, target_outcomes: [] },
+  },
+  held_for_review: { count: 2, avoidable: 1, precision_avoidable: 0.5, base_rate_avoidable: 0.4, recall_avoidable: 0.2 },
+  fixed_bugs_delayed: { count: 1, fixed_total: 5, rate: 0.2, by_verdict: {} },
+  p1: { total: 2, misses: 0 },
+  assumptions: ["Sample assumption"],
+  clean_holdout: false,
+};
+const backtest = {
+  ...run,
+  result_label: "revised_not_clean_holdout",
+  methodology_note: "Sample note",
+  original_pre_change: { ...run, result_label: "original_pre_change" },
 };
 
 describe("contract", () => {
@@ -48,31 +69,25 @@ describe("contract", () => {
     expect(parsed.weeks[0]?.avg_open_7d).toBeNull();
   });
 
-  it("reads backtest aliases and retains unknown numeric fields", () => {
-    expect(
-      backtestSchema.parse({
-        verdicts: { try_l1_fix: 4 },
-        precision: 0.8,
-        bugs_delayed: { count: 3 },
-        p1_misses: 0,
-        sample_size: 90,
-      }),
-    ).toEqual({
-      verdictCounts: { try_l1_fix: 4 },
-      precision: 0.8,
-      trueBugsDelayed: 3,
-      p1Misses: 0,
-      extras: { sample_size: 90 },
-    });
+  it("parses the backtest shape, including a null precision", () => {
+    const parsed = backtestSchema.parse(backtest);
+    expect(parsed.precision_by_verdict.needs_info?.precision).toBeNull();
+    expect(parsed.original_pre_change?.result_label).toBe("original_pre_change");
   });
 
-  it("leaves missing backtest fields null instead of zero", () => {
-    expect(backtestSchema.parse({})).toEqual({
-      verdictCounts: null,
-      precision: null,
-      trueBugsDelayed: null,
-      p1Misses: null,
-      extras: {},
-    });
+  it("rejects a backtest without its result label or methodology note", () => {
+    expect(backtestSchema.safeParse({ ...backtest, result_label: undefined }).success).toBe(false);
+    expect(backtestSchema.safeParse({ ...backtest, methodology_note: undefined }).success).toBe(false);
+  });
+
+  it("keeps parsing the retired try_l1_fix verdict", () => {
+    expect(verdictSchema.parse("try_l1_fix")).toBe("try_l1_fix");
+  });
+
+  it("parses post-triage ticket fields as null on open tickets", () => {
+    const parsed = ticketSchema.parse({ ...ticket, client_id: "C-1", eng_outcome: null });
+    expect(parsed.client_id).toBe("C-1");
+    expect(parsed.eng_outcome).toBeNull();
+    expect(parsed.csat_score).toBeNull();
   });
 });
