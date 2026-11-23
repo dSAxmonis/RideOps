@@ -11,16 +11,7 @@ import { ErrorNotice, LoadingRows, QueryBoundary } from "@/components/QueryState
 import { DecisionBar } from "@/components/workspace/DecisionBar";
 import { P1FastPath, PrecheckPanel } from "@/components/workspace/PrecheckPanel";
 
-const KNOWN_FIELDS = new Set([
-  "ticket_id", "created_at", "channel", "client_name", "client_tier", "category",
-  "priority", "description", "assigned_agent", "status", "escalated_to_eng",
-]);
-
 function TicketDetails({ ticket }: { ticket: Ticket }) {
-  const extras = Object.entries(ticket).filter(
-    ([key, value]) =>
-      !KNOWN_FIELDS.has(key) && ["string", "number", "boolean"].includes(typeof value),
-  );
   const fields: [string, string][] = [
     ["Client", `${ticket.client_name ?? "n/a"}${ticket.client_tier ? ` (${ticket.client_tier})` : ""}`],
     ["Category", ticket.category ?? "n/a"],
@@ -29,8 +20,22 @@ function TicketDetails({ ticket }: { ticket: Ticket }) {
     ["Status", humanize(ticket.status)],
     ["Created", formatDateTime(ticket.created_at)],
     ["Sent to engineering", ticket.escalated_to_eng ? "Yes" : "No"],
-    ...extras.map(([key, value]): [string, string] => [humanize(key), String(value)]),
   ];
+  // Post-triage fields are null on open tickets, so these rows appear only on history.
+  const optional: [string, string | null][] = [
+    ["Client ID", ticket.client_id],
+    ["First response", ticket.first_response_at && formatDateTime(ticket.first_response_at)],
+    ["Engineering ticket", ticket.eng_ticket_id],
+    ["Engineering handoffs", ticket.eng_handoffs === null ? null : String(ticket.eng_handoffs)],
+    ["Engineering outcome", ticket.eng_outcome && humanize(ticket.eng_outcome)],
+    ["First closed", ticket.first_closed_at && formatDateTime(ticket.first_closed_at)],
+    ["Final closed", ticket.final_closed_at && formatDateTime(ticket.final_closed_at)],
+    ["Reopens", ticket.reopen_count === null ? null : String(ticket.reopen_count)],
+    ["CSAT", ticket.csat_score === null ? null : String(ticket.csat_score)],
+  ];
+  for (const [label, value] of optional) {
+    if (value !== null) fields.push([label, value]);
+  }
   return (
     <article className="border border-line bg-surface p-3">
       <div className="flex items-center gap-2">
@@ -101,10 +106,12 @@ function CheckColumn({ ticket }: { ticket: Ticket }) {
     <DecisionBar
       priority={ticket.priority}
       verdict={verdict}
+      evidence={evidence}
+      checking={precheck.isFetching}
       submitting={decision.isPending}
       error={decision.error}
       recorded={recorded}
-      onSubmit={decision.mutate}
+      onSubmit={(body, options) => decision.mutate(body, options)}
     />
   );
 

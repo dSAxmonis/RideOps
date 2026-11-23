@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { ApiError, isWakingError } from "@/lib/api";
+import { ApiError, isOverrideRequiredError, isWakingError } from "@/lib/api";
 import type { DecisionAction, DecisionRequest, Verdict } from "@/lib/contract";
 import { isP1, requiresOverrideReason } from "@/lib/domain";
 import { useAgentName } from "@/lib/useAgentName";
@@ -35,6 +35,8 @@ function failureMessage(error: unknown) {
 export function DecisionBar({
   priority,
   verdict,
+  evidence,
+  checking = false,
   submitting,
   error,
   recorded,
@@ -42,16 +44,24 @@ export function DecisionBar({
 }: {
   priority: string;
   verdict: Verdict | null;
+  evidence: Record<string, boolean>;
+  /** The verdict is being recomputed, so a reason requirement may be about to change. */
+  checking?: boolean;
   submitting: boolean;
   error: unknown;
   recorded: DecisionAction | null;
-  onSubmit: (decision: DecisionRequest) => void;
+  onSubmit: (decision: DecisionRequest, options: { onError: (error: unknown) => void }) => void;
 }) {
   const [agent, setAgent] = useAgentName();
   const [pending, setPending] = useState<DecisionAction | null>(null);
   const [reason, setReason] = useState("");
   const [showMissing, setShowMissing] = useState(false);
+  // Holds the verdict the server demanded a reason for; a new verdict clears it.
+  const [serverRequired, setServerRequired] = useState<{ verdict: Verdict | null } | null>(null);
   const fastPath = isP1(priority);
+  const serverNeedsReason = serverRequired !== null && serverRequired.verdict === verdict;
+  const reasonRequired = (action: DecisionAction) =>
+    requiresOverrideReason(action, verdict, priority) || (action === "escalated" && serverNeedsReason);
 
   if (recorded) {
     return (
@@ -61,28 +71,38 @@ export function DecisionBar({
     );
   }
 
-  const needsReason = pending ? requiresOverrideReason(pending, verdict, priority) : false;
+  const needsReason = pending ? reasonRequired(pending) : false;
 
   const send = (action: DecisionAction) => {
     const trimmedAgent = agent.trim();
     const trimmedReason = reason.trim();
-    const reasonNeeded = requiresOverrideReason(action, verdict, priority);
+    const reasonNeeded = reasonRequired(action);
     const agentMissing = !trimmedAgent && !(fastPath && action === "escalated");
     if (agentMissing || (reasonNeeded && !trimmedReason)) {
       setShowMissing(true);
       return;
     }
-    onSubmit({
-      action,
-      verdict_shown: verdict,
-      agent: trimmedAgent || P1_FALLBACK_AGENT,
-      ...(reasonNeeded ? { override_reason: trimmedReason } : {}),
-    });
+    onSubmit(
+      {
+        action,
+        verdict_shown: verdict,
+        evidence,
+        agent: trimmedAgent || P1_FALLBACK_AGENT,
+        ...(reasonNeeded ? { override_reason: trimmedReason } : {}),
+      },
+      {
+        onError: (failure) => {
+          if (!isOverrideRequiredError(failure)) return;
+          setServerRequired({ verdict });
+          setPending("escalated");
+        },
+      },
+    );
   };
 
   const choose = (action: DecisionAction) => {
     setShowMissing(false);
-    if (fastPath && action === "escalated") send(action);
+    if (fastPath && action === "escalated" && !serverNeedsReason) send(action);
     else setPending(action);
   };
 
@@ -130,7 +150,9 @@ export function DecisionBar({
           {needsReason ? (
             <div>
               <label htmlFor="override-reason" className="mb-0.5 block text-[13px] font-medium">
-                {verdict
+                {serverNeedsReason
+                  ? "The server needs a one-line reason for this escalation."
+                  : verdict
                   ? `The check advised "${verdictLabel(verdict)}". Why escalate anyway?`
                   : "The check is unavailable. Why escalate?"}
               </label>
@@ -158,8 +180,8 @@ export function DecisionBar({
             <button type="button" className={buttonClass} onClick={() => setPending(null)}>
               Cancel
             </button>
-            <button type="submit" className={primaryClass} disabled={submitting}>
-              {submitting ? "Saving" : `Confirm: ${ACTION_LABEL[pending]}`}
+            <button type="submit" className={primaryClass} disabled={submitting || (checking && !fastPath)}>
+              {submitting ? "Saving" : checking && !fastPath ? "Re-checking" : `Confirm: ${ACTION_LABEL[pending]}`}
             </button>
           </div>
         </form>

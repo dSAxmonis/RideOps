@@ -22,6 +22,9 @@ export class ApiError extends Error {
   }
 }
 
+export const isOverrideRequiredError = (error: unknown) =>
+  error instanceof ApiError && error.status === 422 && /override_reason/.test(error.detail ?? "");
+
 export const isWakingError = (error: unknown) =>
   error instanceof ApiError && error.status === 503 && error.code === "upstream_unavailable";
 
@@ -34,7 +37,14 @@ export const shouldRetry = (failureCount: number, error: unknown) =>
 function detailFrom(body: unknown) {
   if (typeof body !== "object" || body === null) return undefined;
   const { detail } = body as { detail?: unknown };
-  return typeof detail === "string" ? detail : undefined;
+  if (typeof detail === "string") return detail;
+  if (!Array.isArray(detail)) return undefined;
+  const messages = detail
+    .map((item: unknown) =>
+      typeof item === "object" && item !== null && "msg" in item ? String(item.msg) : "",
+    )
+    .filter(Boolean);
+  return messages.length > 0 ? messages.join("; ") : undefined;
 }
 
 async function request<S extends z.ZodType>(
