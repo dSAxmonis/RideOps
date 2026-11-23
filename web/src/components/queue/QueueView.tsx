@@ -124,7 +124,7 @@ export function QueueView() {
       else next.delete(key);
     }
     const text = next.toString();
-    router.replace(text ? `/?${text}` : "/", { scroll: false });
+    router.replace(text ? `/queue?${text}` : "/queue", { scroll: false });
   };
 
   useEffect(() => {
@@ -134,7 +134,7 @@ export function QueueView() {
       if (draft) next.set("q", draft);
       else next.delete("q");
       const text = next.toString();
-      router.replace(text ? `/?${text}` : "/", { scroll: false });
+      router.replace(text ? `/queue?${text}` : "/queue", { scroll: false });
     }, 300);
     return () => clearTimeout(timer);
   }, [draft, urlQuery, router]);

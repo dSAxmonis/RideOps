@@ -50,14 +50,15 @@ function ThemeSelect() {
 export function AppHeader() {
   const pathname = usePathname();
   const links = [
-    { href: "/", label: "Queue", active: pathname === "/" || pathname.startsWith("/tickets") },
+    { href: "/burndown", label: "Burn-down", active: pathname === "/" || pathname.startsWith("/burndown") },
+    { href: "/queue", label: "Queue", active: pathname.startsWith("/queue") || pathname.startsWith("/tickets") },
     { href: "/impact", label: "Impact", active: pathname.startsWith("/impact") },
   ];
 
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-x-4 gap-y-1 px-4 py-1.5">
-        <Link href="/" className="font-semibold">
+        <Link href="/burndown" className="font-semibold">
           RideOps <span className="font-normal text-ink-2">Pre-Escalation Check</span>
         </Link>
         <nav aria-label="Main" className="flex gap-1">
