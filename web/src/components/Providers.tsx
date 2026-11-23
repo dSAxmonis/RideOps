@@ -12,7 +12,9 @@ export function Providers({ children }: { children: ReactNode }) {
           queries: {
             retry: shouldRetry,
             retryDelay: WAKE_RETRY_DELAY_MS,
-            staleTime: 30_000,
+            // Ticket data is a fixed snapshot, and recorded actions invalidate what they change.
+            staleTime: 5 * 60_000,
+            gcTime: 30 * 60_000,
             refetchOnWindowFocus: false,
           },
           mutations: { retry: false },

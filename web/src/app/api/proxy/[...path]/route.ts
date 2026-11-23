@@ -10,6 +10,8 @@ import {
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
+// Runs next to the Render API in Singapore.
+export const preferredRegion = "sin1";
 
 const MAX_BODY_BYTES = 16 * 1024;
 const NO_STORE = { "Cache-Control": "no-store" };
