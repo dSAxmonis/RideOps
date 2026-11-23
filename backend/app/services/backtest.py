@@ -40,7 +40,9 @@ ASSUMPTIONS = (
 METHODOLOGY_NOTE = (
     "try_l1_fix was demoted to a non-blocking hint after its weak September precision was "
     "seen. No threshold was tuned on September, but this design change was informed by it, "
-    "so the revised result is not a clean holdout. original_pre_change is the holdout result."
+    "so the revised result is not a clean holdout. original_pre_change is the first replay; "
+    "its thresholds were set on August, but full-period category counts were seen in profiling, "
+    "so it is not perfectly blind either."
 )
 
 
@@ -67,8 +69,8 @@ def run_backtest(
         "methodology_note": METHODOLOGY_NOTE,
         "original_pre_change": {
             **original,
-            "result_label": "original_pre_change_holdout",
-            "clean_holdout": True,
+            "result_label": "original_pre_change",
+            "clean_holdout": False,
         },
     }
 

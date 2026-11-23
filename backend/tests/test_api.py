@@ -249,7 +249,8 @@ def test_backtest_reports_guardrails(client):
     assert body["result_label"] == "revised_not_clean_holdout"
     assert "not a clean holdout" in body["methodology_note"]
     original = body["original_pre_change"]
-    assert original["clean_holdout"] is True
+    assert original["result_label"] == "original_pre_change"
+    assert original["clean_holdout"] is False
     assert original["policy_version"] == "2026-11.v1"
     assert original["escalations"] == body["escalations"]
     assert "lift" in body["precision_by_verdict"]["likely_known_issue"]
