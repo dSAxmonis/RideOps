@@ -107,3 +107,35 @@ def test_open_ticket_hides_post_triage_fields(client):
         assert body[field] is None
     closed = client.get("/api/v1/tickets/T-E0", headers=HEADERS).json()
     assert closed["eng_outcome"] == DUPLICATE
+
+
+def test_every_open_ticket_hides_populated_post_triage_fields(tmp_path):
+    from tests.conftest import HEADERS, make_client
+
+    rows = [
+        escalated(
+            "T-REOPENED",
+            "2026-09-01 09:00",
+            "",
+            FIXED,
+            status="Open - with L1",
+        )
+    ]
+    rows[0].update(
+        first_closed_at="2026-09-02 09:00", eng_handoffs="3", reopen_count="2", csat_score="1"
+    )
+    rows.append(row("T-CLOSED", "2026-09-01 10:00", final_closed_at="2026-09-02 10:00"))
+    fields = (
+        "eng_outcome",
+        "eng_handoffs",
+        "first_closed_at",
+        "final_closed_at",
+        "reopen_count",
+        "csat_score",
+    )
+    with make_client(write_csv(tmp_path / "open.csv", rows)) as client:
+        listed = client.get("/api/v1/tickets?status=open", headers=HEADERS).json()
+        assert [item["ticket_id"] for item in listed["items"]] == ["T-REOPENED"]
+        for item in listed["items"]:
+            body = client.get(f"/api/v1/tickets/{item['ticket_id']}", headers=HEADERS).json()
+            assert {field: body[field] for field in fields} == dict.fromkeys(fields)
