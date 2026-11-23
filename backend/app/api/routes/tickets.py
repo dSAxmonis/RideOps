@@ -16,6 +16,8 @@ from app.domain.schemas import (
     ChecklistEntry,
     DecisionRequest,
     DecisionResponse,
+    KnownIssueRef,
+    PlaybookView,
     PrecheckRequest,
     PrecheckResponse,
     SimilarTicket,
@@ -23,7 +25,7 @@ from app.domain.schemas import (
     TicketList,
     TicketSummary,
 )
-from app.services.checklist import UnknownEvidenceKeyError
+from app.services.checklist import UnknownEvidenceKeyError, known_proofs
 from app.services.precheck import run_precheck
 
 router = APIRouter(prefix="/tickets", tags=["tickets"], dependencies=[Depends(require_access_code)])
@@ -93,7 +95,7 @@ def precheck(
     try:
         result = run_precheck(
             TriageView.from_ticket(ticket),
-            body.evidence,
+            state.data.scrub_evidence(body.evidence) or {},
             state.data.knowledge,
             note=body.note,
         )
@@ -105,7 +107,14 @@ def precheck(
         confidence_band=result.confidence_band,
         reasons=result.reasons,
         checklist=[
-            ChecklistEntry(key=s.key, label=s.label, required=s.required, done=s.done)
+            ChecklistEntry(
+                key=s.key,
+                label=s.label,
+                required=s.required,
+                done=s.done,
+                proof=s.proof,
+                proof_hint=s.proof_hint,
+            )
             for s in result.checklist
         ],
         similar=[
@@ -120,6 +129,17 @@ def precheck(
             for m in result.similar
         ],
         suggested_action=result.suggested_action,
+        known_issue=(
+            KnownIssueRef(
+                id=result.known_issue.id,
+                title=result.known_issue.title,
+                duplicate_count=result.known_issue.duplicate_count,
+                last_seen=result.known_issue.last_seen,
+            )
+            if result.known_issue
+            else None
+        ),
+        playbook=PlaybookView(title=result.playbook.title, steps=list(result.playbook.steps)),
     )
 
 
@@ -134,16 +154,17 @@ def record_decision(
     state: AppState = Depends(get_state),
 ) -> DecisionResponse:
     ticket = _find(state, ticket_id)
+    evidence = state.data.scrub_evidence(body.evidence)
     if ticket.priority == PRIORITY_P1:
         server_verdict = Verdict.READY_TO_ESCALATE
     else:
         try:
             server_verdict = run_precheck(
-                TriageView.from_ticket(ticket), body.evidence or {}, state.data.knowledge
+                TriageView.from_ticket(ticket), evidence or {}, state.data.knowledge
             ).verdict
         except UnknownEvidenceKeyError as exc:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
-    reason = body.override_reason or None
+    reason = state.data.scrub(body.override_reason) or None
     if override_reason_required(body.action, server_verdict, ticket.priority) and not reason:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -155,6 +176,7 @@ def record_decision(
         verdict_shown=body.verdict_shown.value if body.verdict_shown else None,
         server_verdict=server_verdict.value,
         override_reason=reason,
-        agent=body.agent,
+        evidence=known_proofs(ticket.category, evidence),
+        agent=state.data.scrub(body.agent),
     )
     return DecisionResponse.model_validate(row)

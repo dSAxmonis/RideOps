@@ -11,6 +11,7 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from app.domain.models import TicketRecord, TriageView
+from app.services.known_issues import KnownIssueRegistry
 
 MODEL_CACHE_SIZE = 8
 
@@ -55,6 +56,7 @@ class KnowledgeBase:
             key=lambda entry: (entry.closed_at, entry.ticket_id),
         )
         self._closed_times = [entry.closed_at for entry in self._entries]
+        self.known_issues = KnownIssueRegistry(self._entries)
         self._models: OrderedDict[int, _Model] = OrderedDict()
         self._lock = Lock()
 
