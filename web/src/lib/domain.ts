@@ -63,8 +63,11 @@ export function formatRate(value: number | null, digits = 1) {
   return `${percent.toFixed(digits)}%`;
 }
 
-export const toPercent = (value: number | null) =>
-  value === null ? null : Math.abs(value) <= 1 ? value * 100 : value;
+/** Scales a whole series together, so a low percentage is not read as a fraction. */
+export function toPercentSeries(values: (number | null)[]) {
+  const isFraction = values.every((value) => value === null || Math.abs(value) <= 1);
+  return values.map((value) => (value === null ? null : isFraction ? value * 100 : value));
+}
 
 export const humanize = (value: string) => {
   const text = value.replace(/_/g, " ");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRate, requiresOverrideReason, sortQueue } from "@/lib/domain";
+import { formatRate, requiresOverrideReason, sortQueue, toPercentSeries } from "@/lib/domain";
 
 describe("sortQueue", () => {
   it("sorts by priority, then oldest first", () => {
@@ -30,5 +30,12 @@ describe("formatRate", () => {
     expect(formatRate(0.125)).toBe("12.5%");
     expect(formatRate(42)).toBe("42.0%");
     expect(formatRate(null)).toBe("n/a");
+  });
+});
+
+describe("toPercentSeries", () => {
+  it("scales fractions and leaves percentage series alone", () => {
+    expect(toPercentSeries([0.5, null])).toEqual([50, null]);
+    expect(toPercentSeries([0.5, 12])).toEqual([0.5, 12]);
   });
 });
