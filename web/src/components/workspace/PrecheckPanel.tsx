@@ -130,7 +130,7 @@ function Checklist({
                 value={item.proof}
                 maxLength={MAX_PROOF_CHARS}
                 onChange={(event) => onProofChange(item.key, event.target.value)}
-                placeholder={item.proof_hint || "Short proof"}
+                placeholder="Short proof"
                 aria-describedby={item.proof_hint ? hintId : undefined}
                 autoComplete="off"
                 className="mt-0.5 h-8 w-full rounded border border-line bg-surface px-2"
