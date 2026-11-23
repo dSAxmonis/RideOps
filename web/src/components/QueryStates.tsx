@@ -7,7 +7,10 @@ import { Icon } from "@/components/Icon";
 const SLOW_AFTER_MS = 4_000;
 
 export const buttonClass =
-  "inline-flex min-h-9 items-center justify-center gap-1.5 rounded border border-line bg-surface px-3 py-1.5 text-[13px] font-medium text-ink hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface px-4 py-2 text-sm font-medium text-ink hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50";
+
+export const primaryButtonClass =
+  "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
 
 function useSlowFlag(active: boolean) {
   const [slow, setSlow] = useState(false);
@@ -24,7 +27,7 @@ function useSlowFlag(active: boolean) {
 
 export function WakingNotice({ onRetry, stopped = false }: { onRetry?: () => void; stopped?: boolean }) {
   return (
-    <div role="status" className="flex flex-wrap items-center gap-2 border border-line bg-surface px-3 py-2.5">
+    <div role="status" className="card flex flex-wrap items-center gap-2">
       <Icon name="info" className="text-ink-2" />
       <p className="min-w-0 flex-1">
         {stopped
@@ -55,7 +58,7 @@ function errorMessage(error: unknown) {
 export function ErrorNotice({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   if (isWakingError(error)) return <WakingNotice stopped onRetry={onRetry} />;
   return (
-    <div role="alert" className="flex flex-wrap items-center gap-2 border border-line bg-surface px-3 py-2.5">
+    <div role="alert" className="card flex flex-wrap items-center gap-2">
       <Icon name="alert" className="text-critical" />
       <p className="min-w-0 flex-1">{errorMessage(error)}</p>
       <button type="button" className={buttonClass} onClick={onRetry}>
@@ -66,14 +69,14 @@ export function ErrorNotice({ error, onRetry }: { error: unknown; onRetry: () =>
 }
 
 export function EmptyNotice({ children }: { children: ReactNode }) {
-  return <p className="border border-line bg-surface px-3 py-6 text-center text-ink-2">{children}</p>;
+  return <p className="card py-10 text-center text-ink-2">{children}</p>;
 }
 
 export function LoadingRows({ rows = 6 }: { rows?: number }) {
   return (
-    <div aria-hidden="true" className="space-y-px">
+    <div aria-hidden="true" className="space-y-2">
       {Array.from({ length: rows }, (_, index) => (
-        <div key={index} className="h-10 animate-pulse bg-raised" />
+        <div key={index} className="h-12 animate-pulse rounded-2xl bg-surface" />
       ))}
     </div>
   );

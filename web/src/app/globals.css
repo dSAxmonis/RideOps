@@ -2,56 +2,52 @@
 
 :root {
   color-scheme: light;
-  --bg: #f6f6f4;
-  --surface: #fcfcfb;
-  --raised: #efefec;
-  --line: #deded9;
-  --ink: #0b0b0b;
-  --ink-2: #52514e;
-  --ink-3: #6b6a65;
-  --accent: #1c5cab;
+  --bg: #f0f0f1;
+  --surface: #ffffff;
+  --raised: #f4f4f5;
+  --line: #e6e6e8;
+  --ink: #17171a;
+  --ink-2: #65666c;
+  --ink-3: #8a8b91;
+  --accent: #2f62e6;
   --accent-ink: #ffffff;
-  --good: #0ca30c;
-  --warning: #fab219;
-  --serious: #ec835a;
-  --critical: #d03b3b;
+  --good: #1c9a4f;
+  --good-soft: #e7f7ec;
+  --warning: #f4c93e;
+  --serious: #ef9347;
+  --serious-soft: #fff3e9;
+  --serious-text: #b4560f;
+  --teal: #4dbdb0;
+  --critical: #d94343;
+  --critical-soft: #fdecec;
   --critical-text: #b02a2a;
-  --series-1: #2a78d6;
-  --grid: #e6e6e1;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) {
-    color-scheme: dark;
-    --bg: #111110;
-    --surface: #1a1a19;
-    --raised: #262624;
-    --line: #363633;
-    --ink: #f0efec;
-    --ink-2: #c3c2b7;
-    --ink-3: #a3a297;
-    --accent: #86b6ef;
-    --accent-ink: #0b0b0b;
-    --series-1: #3987e5;
-    --grid: #2c2c2a;
-    --critical-text: #f19a9a;
-  }
+  --series-1: #2f62e6;
+  --grid: #eeeef0;
+  --hero-from: #8ba6f1;
+  --hero-to: #3b66e4;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #111110;
-  --surface: #1a1a19;
-  --raised: #262624;
-  --line: #363633;
-  --ink: #f0efec;
-  --ink-2: #c3c2b7;
-  --ink-3: #a3a297;
-  --accent: #86b6ef;
-  --accent-ink: #0b0b0b;
-  --series-1: #3987e5;
-  --grid: #2c2c2a;
+  --bg: #0f1115;
+  --surface: #191c22;
+  --raised: #242831;
+  --line: #2e333d;
+  --ink: #f2f3f5;
+  --ink-2: #b3b7c0;
+  --ink-3: #8d929c;
+  --accent: #7ea0f7;
+  --accent-ink: #0e1320;
+  --good: #4fd083;
+  --good-soft: #15301f;
+  --serious-soft: #33241a;
+  --serious-text: #f6b27a;
+  --critical-soft: #351c1e;
   --critical-text: #f19a9a;
+  --series-1: #7ea0f7;
+  --grid: #2a2e37;
+  --hero-from: #4a68c4;
+  --hero-to: #263f94;
 }
 
 @theme inline {
@@ -65,11 +61,16 @@
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
   --color-warning: var(--warning);
   --color-serious: var(--serious);
+  --color-serious-soft: var(--serious-soft);
+  --color-serious-text: var(--serious-text);
+  --color-teal: var(--teal);
   --color-critical: var(--critical);
+  --color-critical-soft: var(--critical-soft);
   --color-critical-text: var(--critical-text);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -79,12 +80,91 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.45;
+  letter-spacing: -0.005em;
   overflow-x: hidden;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: 22px;
+  padding: 20px;
+}
+
+.hero-card {
+  background: linear-gradient(165deg, var(--hero-from), var(--hero-to));
+  border-radius: 22px;
+  color: #fff;
+  padding: 20px;
+}
+
+.glass-tile {
+  background: rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.28);
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+
+.page-title {
+  font-size: clamp(28px, 3vw, 38px);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.card-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.icon-tile {
+  align-items: center;
+  background: var(--raised);
+  border-radius: 12px;
+  color: var(--ink);
+  display: inline-flex;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.disclosure > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  font-weight: 600;
+  justify-content: space-between;
+  list-style: none;
+}
+
+.disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure > summary::after {
+  color: var(--ink-3);
+  content: "+";
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.disclosure[open] > summary::after {
+  content: "–";
+}
+
+.menu > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.menu > summary::-webkit-details-marker {
+  display: none;
 }
 
 :focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 input,
@@ -97,7 +177,7 @@ textarea {
   input,
   select,
   textarea {
-    font-size: 13px;
+    font-size: 14px;
   }
 }
 

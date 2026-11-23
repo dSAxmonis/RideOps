@@ -49,7 +49,7 @@ function TrendTooltip({
   const row = payload?.[0]?.payload;
   if (!active || !row) return null;
   return (
-    <div className="border border-line bg-surface px-2 py-1 text-xs text-ink shadow-sm">
+    <div className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-ink shadow-md">
       <div className="text-ink-2">
         Week of {shortDate(row.week)}
         {row.partial ? " (partial)" : ""}

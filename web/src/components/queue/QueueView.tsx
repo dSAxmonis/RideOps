@@ -7,13 +7,16 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { MAX_QUEUE_TICKETS, fetchQueue, type TicketFilters } from "@/lib/api";
 import type { TicketSummary } from "@/lib/contract";
 import { formatAge, sortQueue } from "@/lib/domain";
+import { Icon } from "@/components/Icon";
 import { PriorityBadge } from "@/components/PriorityBadge";
-import { EmptyNotice, QueryBoundary, buttonClass } from "@/components/QueryStates";
+import { EmptyNotice, QueryBoundary, buttonClass, primaryButtonClass } from "@/components/QueryStates";
 
-const VISIBLE_STEP = 100;
+const VISIBLE_STEP = 15;
+// Ages are measured at the data pull, so they match the burn-down.
+const SNAPSHOT_MS = Date.parse("2026-09-30T23:59:00");
 const GRID =
-  "md:grid md:grid-cols-[3rem_6.5rem_minmax(0,1fr)_10rem_9rem_8rem_3.5rem] md:items-center md:gap-3";
-const controlClass = "h-9 min-w-0 rounded border border-line bg-surface px-2 text-ink";
+  "md:grid md:grid-cols-[3rem_6.5rem_minmax(0,1fr)_minmax(0,14rem)_3.5rem] md:items-center md:gap-3";
+const controlClass = "h-10 min-w-0 rounded-xl border border-line bg-surface px-3 text-ink";
 
 const uniqueSorted = (values: (string | null)[]) =>
   [...new Set(values.filter((value): value is string => Boolean(value)))].sort();
@@ -49,14 +52,12 @@ export function QueueRows({ tickets, now }: { tickets: TicketSummary[]; now: num
   };
 
   return (
-    <div className="border border-line bg-surface">
-      <div aria-hidden="true" className={`hidden border-b border-line px-3 py-1.5 text-xs font-medium text-ink-2 ${GRID}`}>
+    <div className="mt-3">
+      <div aria-hidden="true" className={`hidden border-b border-line px-2 pb-2 text-[13px] text-ink-2 ${GRID}`}>
         <span>Pri</span>
         <span>Ticket</span>
-        <span>Description</span>
-        <span>Client</span>
+        <span>Issue</span>
         <span>Category</span>
-        <span>Agent</span>
         <span className="text-right">Age</span>
       </div>
       <ul aria-label="Tickets" onKeyDown={onKeyDown}>
@@ -69,28 +70,22 @@ export function QueueRows({ tickets, now }: { tickets: TicketSummary[]; now: num
               href={`/tickets/${encodeURIComponent(ticket.ticket_id)}`}
               tabIndex={index === current ? 0 : -1}
               onFocus={() => setActive(index)}
-              className={`block px-3 py-2 -outline-offset-2 hover:bg-raised md:py-1.5 ${GRID}`}
+              className={`block rounded-lg px-2 py-3 -outline-offset-2 hover:bg-raised ${GRID}`}
             >
               <span className="float-left mr-2 md:float-none md:mr-0">
                 <PriorityBadge priority={ticket.priority} />
               </span>
               <span className="font-mono text-xs text-ink-2">{ticket.ticket_id}</span>
               <span className="float-right text-ink-2 tabular-nums md:hidden">{formatAge(ticket.created_at, now)}</span>
-              <span className="mt-1 block truncate md:mt-0">{ticket.description || "No description"}</span>
-              <span className="block truncate text-xs text-ink-2 md:text-[13px]">
-                {ticket.client_name ?? "n/a"}
-                {ticket.client_tier ? ` (${ticket.client_tier})` : ""}
-                <span className="md:hidden"> · {ticket.category ?? "n/a"}</span>
-              </span>
-              <span className="hidden truncate text-[13px] text-ink-2 md:block">{ticket.category ?? "n/a"}</span>
-              <span className="hidden truncate text-[13px] text-ink-2 md:block">{ticket.assigned_agent ?? "Unassigned"}</span>
+              <span className="mt-1 block truncate font-medium md:mt-0">{ticket.description || "No description"}</span>
+              <span className="block truncate text-ink-2">{ticket.category ?? "n/a"}</span>
               <span className="hidden text-right text-ink-2 tabular-nums md:block">{formatAge(ticket.created_at, now)}</span>
             </Link>
           </li>
         ))}
       </ul>
       {tickets.length > visible ? (
-        <div className="border-t border-line p-2 text-center">
+        <div className="border-t border-line pt-3 text-center">
           <button type="button" className={buttonClass} onClick={() => setVisible(visible + VISIBLE_STEP)}>
             Show more ({tickets.length - visible} left)
           </button>
@@ -106,7 +101,7 @@ export function QueueView() {
   const searchRef = useRef<HTMLInputElement>(null);
   const urlQuery = params.get("q") ?? "";
   const [draft, setDraft] = useState(urlQuery);
-  const [now] = useState(() => Date.now());
+  const now = SNAPSHOT_MS;
 
   const filters: TicketFilters = {
     status: params.get("status") === "all" ? "all" : "open",
@@ -169,31 +164,34 @@ export function QueueView() {
   );
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-base font-semibold">
-          {filters.status === "open" ? "Open tickets" : "All tickets"}
-          {query.data ? <span className="ml-2 font-normal text-ink-2 tabular-nums">{query.data.total}</span> : null}
-        </h1>
-        <p className="hidden text-xs text-ink-2 md:block">
-          Priority, then oldest. <kbd>/</kbd> search, <kbd>↑</kbd> <kbd>↓</kbd> or <kbd>j</kbd> <kbd>k</kbd> move, <kbd>Enter</kbd> open
-        </p>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-baseline gap-3">
+        <h1 className="page-title">{filters.status === "open" ? "Open Tickets" : "All Tickets"}</h1>
+        {query.data ? <span className="text-xl text-ink-3 tabular-nums">{query.data.total}</span> : null}
       </div>
 
-      <div role="search" className="grid grid-cols-2 gap-2 md:flex md:flex-wrap">
-        <input
-          ref={searchRef}
-          type="search"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="Search tickets"
-          aria-label="Search tickets"
-          className={`${controlClass} col-span-2 md:w-64`}
-        />
-        <select aria-label="Status" value={filters.status} onChange={(event) => setParams({ status: event.target.value === "all" ? "all" : "" })} className={controlClass}>
-          <option value="open">Open</option>
-          <option value="all">All</option>
-        </select>
+      <section aria-label="Tickets" className="card">
+      <div role="search" className="flex flex-wrap items-center gap-2">
+        <div className="flex gap-1" role="group" aria-label="Status">
+          <button type="button" aria-pressed={filters.status === "open"} onClick={() => setParams({ status: "" })} className={filters.status === "open" ? primaryButtonClass : buttonClass}>
+            Open
+          </button>
+          <button type="button" aria-pressed={filters.status === "all"} onClick={() => setParams({ status: "all" })} className={filters.status === "all" ? primaryButtonClass : buttonClass}>
+            All
+          </button>
+        </div>
+        <div className="relative min-w-40 flex-1 md:ml-auto md:max-w-72">
+          <Icon name="search" className="pointer-events-none absolute top-3 left-3 text-ink-3" />
+          <input
+            ref={searchRef}
+            type="search"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Search.."
+            aria-label="Search tickets"
+            className={`${controlClass} w-full pl-9`}
+          />
+        </div>
         <select aria-label="Priority" value={filters.priority ?? ""} onChange={(event) => setParams({ priority: event.target.value })} className={controlClass}>
           <option value="">All priorities</option>
           {["P1", "P2", "P3", "P4"].map((priority) => (
@@ -215,7 +213,7 @@ export function QueueView() {
         {hasFilters ? (
           <button
             type="button"
-            className={`${buttonClass} col-span-2 md:col-span-1`}
+            className={buttonClass}
             onClick={() => {
               setDraft("");
               setParams({ agent: "", category: "", priority: "", q: "" });
@@ -233,7 +231,7 @@ export function QueueView() {
           ) : (
             <>
               {data.truncated ? (
-                <p role="status" className="border border-line bg-surface px-3 py-2 text-ink-2">
+                <p role="status" className="mt-3 rounded-xl bg-raised px-3 py-2 text-ink-2">
                   Showing {data.items.length} of {data.total}, limit {MAX_QUEUE_TICKETS}. Narrow the filters to see the rest.
                 </p>
               ) : null}
@@ -242,6 +240,7 @@ export function QueueView() {
           )
         }
       </QueryBoundary>
+      </section>
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { ApiError, isOverrideRequiredError, isWakingError } from "@/lib/api";
 import type { DecisionAction, DecisionRequest, Evidence, Verdict } from "@/lib/contract";
 import { isP1, requiresOverrideReason } from "@/lib/domain";
 import { useAgentName } from "@/lib/useAgentName";
-import { buttonClass } from "@/components/QueryStates";
+import { buttonClass, primaryButtonClass as primaryClass } from "@/components/QueryStates";
 import { verdictLabel } from "@/components/workspace/PrecheckPanel";
 
 const ACTION_LABEL: Record<DecisionAction, string> = {
@@ -20,9 +20,6 @@ const DONE_LABEL: Record<DecisionAction, string> = {
 };
 const MAX_REASON = 200;
 const P1_FALLBACK_AGENT = "unidentified";
-
-const primaryClass =
-  "inline-flex min-h-9 items-center justify-center rounded border border-accent bg-accent px-3 py-1.5 text-[13px] font-semibold text-accent-ink hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
 
 function failureMessage(error: unknown) {
   if (isWakingError(error)) {
@@ -68,7 +65,7 @@ export function DecisionBar({
 
   if (recorded) {
     return (
-      <p role="status" className="border border-line bg-surface px-3 py-2 font-medium">
+      <p role="status" className="card font-medium text-good">
         Recorded: {DONE_LABEL[recorded]}.
       </p>
     );
@@ -119,9 +116,9 @@ export function DecisionBar({
   const escalateIsPrimary = fastPath || verdict === "ready_to_escalate";
 
   return (
-    <div className="sticky bottom-0 z-10 space-y-2 border border-line bg-surface p-2 lg:static">
+    <div className="card sticky bottom-2 z-10 space-y-3 shadow-lg lg:static lg:shadow-none">
       <div className="flex items-center gap-2">
-        <label htmlFor="agent-name" className="shrink-0 text-xs text-ink-2">
+        <label htmlFor="agent-name" className="shrink-0 text-[13px] text-ink-2">
           Acting as
         </label>
         <input
@@ -132,7 +129,7 @@ export function DecisionBar({
           placeholder="Your name"
           autoComplete="name"
           aria-invalid={agentError || undefined}
-          className={`h-8 min-w-0 flex-1 rounded border bg-surface px-2 ${agentError ? "border-critical" : "border-line"}`}
+          className={`h-10 min-w-0 flex-1 rounded-xl border bg-surface px-3 ${agentError ? "border-critical" : "border-line"}`}
         />
       </div>
 
@@ -167,7 +164,7 @@ export function DecisionBar({
                 onChange={(event) => setReason(event.target.value)}
                 placeholder="One line is enough"
                 aria-invalid={reasonError || undefined}
-                className={`h-9 w-full rounded border bg-surface px-2 ${reasonError ? "border-critical" : "border-line"}`}
+                className={`h-10 w-full rounded-xl border bg-surface px-3 ${reasonError ? "border-critical" : "border-line"}`}
               />
             </div>
           ) : (
