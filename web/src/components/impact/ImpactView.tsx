@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
-import { fetchBacktest, fetchWeekly, isWakingError } from "@/lib/api";
+import { fetchBacktest, fetchLiveMetrics, fetchWeekly, isWakingError } from "@/lib/api";
 import type { Backtest, BacktestRun, LiveMetrics, WeekMetrics } from "@/lib/contract";
 import { formatRate, humanize, toPercentSeries } from "@/lib/domain";
 import { Icon } from "@/components/Icon";

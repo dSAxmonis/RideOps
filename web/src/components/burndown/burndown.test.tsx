@@ -81,7 +81,7 @@ describe("BurndownView", () => {
 
   it("asks for a name before recording", async () => {
     localStorage.setItem("rideops_agent_name", "");
-    const fetchMock = vi.fn(async (_url: string) => json(board()));
+    const fetchMock = vi.fn<(url: string) => Promise<Response>>(async () => json(board()));
     vi.stubGlobal("fetch", fetchMock);
     renderView();
     await userEvent.click(await screen.findByRole("button", { name: "Clear T-1" }));
