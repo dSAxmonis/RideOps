@@ -45,6 +45,7 @@ AVOIDABLE_OUTCOMES = frozenset(
 L1_FIXABLE_OUTCOMES = frozenset({OUTCOME_CONFIG, OUTCOME_HOW_TO})
 
 PRIORITY_P1 = "P1"
+OVERRIDE_VERDICTS = frozenset({Verdict.LIKELY_KNOWN_ISSUE, Verdict.NEEDS_INFO})
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +100,6 @@ class TriageView:
 def override_reason_required(action: DecisionAction, verdict: Verdict, priority: str) -> bool:
     return (
         action is DecisionAction.ESCALATED
-        and verdict is not Verdict.READY_TO_ESCALATE
+        and verdict in OVERRIDE_VERDICTS
         and priority != PRIORITY_P1
     )

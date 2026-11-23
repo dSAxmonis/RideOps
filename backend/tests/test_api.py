@@ -1,7 +1,17 @@
 import pytest
 
 from app.domain.checklists import CHECKLISTS
-from tests.conftest import EXPORT, HEADERS, ROSTER, all_evidence, make_client
+from tests.conftest import (
+    CONFIG,
+    EXPORT,
+    HEADERS,
+    ROSTER,
+    all_evidence,
+    escalated,
+    make_client,
+    row,
+    write_csv,
+)
 
 PROTECTED = [
     ("get", "/api/v1/tickets"),
@@ -178,6 +188,43 @@ def test_decision_rejects_unknown_evidence_key(client):
         evidence={"bogus": True},
     )
     assert response.status_code == 422
+
+
+def test_l1_tip_is_a_hint_and_needs_no_override(tmp_path):
+    rows = [
+        escalated(
+            f"T-C{index}",
+            f"2026-07-{index + 10} 09:00",
+            f"2026-07-{index + 10} 18:00",
+            CONFIG,
+            text="gamma setting looks wrong",
+        )
+        for index in range(10)
+    ]
+    rows.append(
+        row(
+            "T-H1",
+            "2026-08-10 09:00",
+            text="gamma setting looks wrong",
+            first_closed_at="2026-08-10 12:00",
+            final_closed_at="2026-08-10 12:00",
+        )
+    )
+    evidence = all_evidence(ROSTER)
+    with make_client(write_csv(tmp_path / "hint.csv", rows)) as hint_client:
+        body = precheck(hint_client, "T-H1", evidence)
+        assert body["verdict"] == "ready_to_escalate"
+        assert any(reason.startswith("Hint (non-blocking)") for reason in body["reasons"])
+        assert "Optional" in body["suggested_action"]
+        decision = decide(
+            hint_client,
+            "T-H1",
+            action="escalated",
+            verdict_shown="try_l1_fix",
+            evidence=evidence,
+        )
+        assert decision.status_code == 201
+        assert decision.json()["server_verdict"] == "ready_to_escalate"
 
 
 def test_weekly_metrics_shape_and_totals(client):

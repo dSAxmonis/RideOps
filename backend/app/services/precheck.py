@@ -31,7 +31,7 @@ class Rule(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class PrecheckPolicy:
-    version: str = "2026-11.v1"
+    version: str = "2026-11.v2"
     similarity_floor: float = 0.5
     shrinkage: float = 5.0
     min_category_history: int = 10
@@ -39,9 +39,15 @@ class PrecheckPolicy:
     known_issue_threshold: float = 0.3
     l1_fix_threshold: float = 0.4
     top_k: int = 5
+    l1_fix_holds: bool = False
 
 
 DEFAULT_POLICY = PrecheckPolicy()
+ORIGINAL_POLICY = PrecheckPolicy(version="2026-11.v1", l1_fix_holds=True)
+L1_HINT = (
+    "Hint (non-blocking): similar prior escalations were often config or how-to issues; "
+    "a quick L1 check may help."
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +111,15 @@ def build_signals(
     )
 
 
+def has_l1_hint(signals: Signals, policy: PrecheckPolicy = DEFAULT_POLICY) -> bool:
+    l1_support = sum(signals.category_counts[outcome] for outcome in L1_FIXABLE_OUTCOMES)
+    return (
+        signals.category_total >= policy.min_category_history
+        and l1_support >= policy.min_outcome_support
+        and signals.l1_fix_rate >= policy.l1_fix_threshold
+    )
+
+
 def decide(
     priority: str,
     missing_keys: list[str] | None,
@@ -127,12 +142,7 @@ def decide(
     if missing_keys:
         return Verdict.NEEDS_INFO, Rule.MISSING_EVIDENCE
 
-    l1_support = sum(signals.category_counts[outcome] for outcome in L1_FIXABLE_OUTCOMES)
-    if (
-        has_history
-        and l1_support >= policy.min_outcome_support
-        and signals.l1_fix_rate >= policy.l1_fix_threshold
-    ):
+    if policy.l1_fix_holds and has_l1_hint(signals, policy):
         return Verdict.TRY_L1_FIX, Rule.L1_FIX_HISTORY
     return Verdict.READY_TO_ESCALATE, Rule.NO_HOLD_SIGNAL
 
@@ -211,6 +221,10 @@ def run_precheck(
         labels = "; ".join(state.label for state in missing_states)
         prefix = "Warning, missing evidence" if rule is Rule.P1_FAST_PATH else "Missing evidence"
         reasons.insert(1, f"{prefix}: {labels}.")
+    suggested_action = _SUGGESTED_ACTIONS[rule]
+    if rule in {Rule.MISSING_EVIDENCE, Rule.NO_HOLD_SIGNAL} and has_l1_hint(signals, policy):
+        reasons.insert(1, L1_HINT)
+        suggested_action += " Optional: try a quick config or how-to check at L1."
     if note:
         reasons.append("Agent note received; it is not used in scoring.")
 
@@ -222,5 +236,5 @@ def run_precheck(
         reasons=reasons,
         checklist=checklist,
         similar=matches[: policy.top_k],
-        suggested_action=_SUGGESTED_ACTIONS[rule],
+        suggested_action=suggested_action,
     )
