@@ -39,6 +39,7 @@ def decide(client, ticket_id, **body):
 def test_health_needs_no_auth_or_data():
     with make_client(None, access_code=None) as client:
         assert client.get("/api/v1/health").json() == {"status": "ok"}
+        assert client.head("/api/v1/health").status_code == 200
 
 
 @pytest.mark.parametrize(("method", "path"), PROTECTED)
