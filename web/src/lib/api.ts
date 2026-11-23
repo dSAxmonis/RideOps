@@ -94,7 +94,7 @@ export interface TicketFilters {
   q?: string;
 }
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 200;
 export const MAX_QUEUE_TICKETS = 2_000;
 
 export interface TicketQueue {
@@ -105,10 +105,7 @@ export interface TicketQueue {
 
 /** The queue is sorted across all pages, so every page must be loaded first. */
 export async function fetchQueue(filters: TicketFilters, signal?: AbortSignal): Promise<TicketQueue> {
-  const byId = new Map<string, TicketSummary>();
-  let offset = 0;
-  let total = 0;
-  while (offset < MAX_QUEUE_TICKETS) {
+  const loadPage = (offset: number) => {
     const params = new URLSearchParams({
       status: filters.status,
       limit: String(PAGE_SIZE),
@@ -118,13 +115,20 @@ export async function fetchQueue(filters: TicketFilters, signal?: AbortSignal): 
       const value = filters[key];
       if (value) params.set(key, value);
     }
-    const page = await request(`tickets?${params}`, ticketListSchema, { signal });
-    total = page.total;
-    for (const ticket of page.items) byId.set(ticket.ticket_id, ticket);
-    offset += page.items.length;
-    if (page.items.length === 0 || offset >= total) break;
+    return request(`tickets?${params}`, ticketListSchema, { signal });
+  };
+
+  const first = await loadPage(0);
+  const offsets: number[] = [];
+  for (let offset = PAGE_SIZE; offset < Math.min(first.total, MAX_QUEUE_TICKETS); offset += PAGE_SIZE) {
+    offsets.push(offset);
   }
-  return { items: [...byId.values()], total, truncated: total > byId.size };
+  const rest = await Promise.all(offsets.map(loadPage));
+  const byId = new Map<string, TicketSummary>();
+  for (const page of [first, ...rest]) {
+    for (const ticket of page.items) byId.set(ticket.ticket_id, ticket);
+  }
+  return { items: [...byId.values()], total: first.total, truncated: first.total > byId.size };
 }
 
 const ticketPath = (id: string) => `tickets/${encodeURIComponent(id)}`;
