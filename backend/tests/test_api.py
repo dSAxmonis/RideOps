@@ -134,14 +134,50 @@ def test_override_reason_required_against_non_ready_verdict(client):
 
 def test_override_not_required_for_p1_or_ready_or_non_escalation(client):
     assert decide(client, "T-P1", action="escalated", verdict_shown="needs_info").status_code == 201
-    assert (
-        decide(client, "T-Q1", action="escalated", verdict_shown="ready_to_escalate").status_code
-        == 201
+    ready = decide(
+        client,
+        "T-R1",
+        action="escalated",
+        verdict_shown="ready_to_escalate",
+        evidence=all_evidence(ROSTER),
     )
+    assert ready.status_code == 201
+    assert ready.json()["server_verdict"] == "ready_to_escalate"
     assert (
         decide(client, "T-Q1", action="resolved_at_l1", verdict_shown="try_l1_fix").status_code
         == 201
     )
+
+
+@pytest.mark.parametrize(("ticket_id", "server"), [("T-Q1", "known"), ("T-R1", "info")])
+def test_misreported_verdict_cannot_avoid_override_reason(client, ticket_id, server):
+    response = decide(client, ticket_id, action="escalated", verdict_shown="ready_to_escalate")
+    assert response.status_code == 422, server
+
+
+def test_decision_stores_client_and_server_verdicts(client):
+    response = decide(
+        client,
+        "T-Q1",
+        action="escalated",
+        verdict_shown="ready_to_escalate",
+        override_reason="Agent saw a different error",
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["verdict_shown"] == "ready_to_escalate"
+    assert body["server_verdict"] == "likely_known_issue"
+
+
+def test_decision_rejects_unknown_evidence_key(client):
+    response = decide(
+        client,
+        "T-R1",
+        action="escalated",
+        verdict_shown="ready_to_escalate",
+        evidence={"bogus": True},
+    )
+    assert response.status_code == 422
 
 
 def test_weekly_metrics_shape_and_totals(client):

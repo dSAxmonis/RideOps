@@ -128,8 +128,14 @@ def record_decision(
     state: AppState = Depends(get_state),
 ) -> DecisionResponse:
     ticket = _find(state, ticket_id)
+    try:
+        server_verdict = run_precheck(
+            TriageView.from_ticket(ticket), body.evidence, state.data.knowledge
+        ).verdict
+    except UnknownEvidenceKeyError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
     reason = body.override_reason or None
-    if override_reason_required(body.action, body.verdict_shown, ticket.priority) and not reason:
+    if override_reason_required(body.action, server_verdict, ticket.priority) and not reason:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "override_reason is required when escalating against this verdict",
@@ -138,6 +144,7 @@ def record_decision(
         ticket_id=ticket.ticket_id,
         action=body.action.value,
         verdict_shown=body.verdict_shown.value,
+        server_verdict=server_verdict.value,
         override_reason=reason,
         agent=body.agent,
     )

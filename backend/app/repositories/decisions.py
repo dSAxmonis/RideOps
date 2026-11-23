@@ -17,6 +17,7 @@ class DecisionRow(Base):
     ticket_id: Mapped[str] = mapped_column(String(32), index=True)
     action: Mapped[str] = mapped_column(String(32))
     verdict_shown: Mapped[str] = mapped_column(String(32))
+    server_verdict: Mapped[str] = mapped_column(String(32))
     override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     agent: Mapped[str] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -45,6 +46,7 @@ class DecisionRepository:
         ticket_id: str,
         action: str,
         verdict_shown: str,
+        server_verdict: str,
         override_reason: str | None,
         agent: str,
     ) -> DecisionRow:
@@ -52,6 +54,7 @@ class DecisionRepository:
             ticket_id=ticket_id,
             action=action,
             verdict_shown=verdict_shown,
+            server_verdict=server_verdict,
             override_reason=override_reason,
             agent=agent,
             created_at=datetime.now(UTC),
