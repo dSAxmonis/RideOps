@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from app.domain.models import ConfidenceBand, DecisionAction, Verdict
 
@@ -78,8 +78,8 @@ class DecisionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     action: DecisionAction
-    verdict_shown: Verdict
-    evidence: dict[str, bool] = Field(default_factory=dict)
+    verdict_shown: Verdict | None = None
+    evidence: dict[str, bool] | None = None
     override_reason: LongText | None = None
     agent: ShortText
 
@@ -90,7 +90,7 @@ class DecisionResponse(BaseModel):
     id: int
     ticket_id: str
     action: DecisionAction
-    verdict_shown: Verdict
+    verdict_shown: Verdict | None
     server_verdict: Verdict
     override_reason: str | None
     agent: str

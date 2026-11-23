@@ -16,7 +16,7 @@ class DecisionRow(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     ticket_id: Mapped[str] = mapped_column(String(32), index=True)
     action: Mapped[str] = mapped_column(String(32))
-    verdict_shown: Mapped[str] = mapped_column(String(32))
+    verdict_shown: Mapped[str | None] = mapped_column(String(32), nullable=True)
     server_verdict: Mapped[str] = mapped_column(String(32))
     override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     agent: Mapped[str] = mapped_column(String(120))
@@ -45,7 +45,7 @@ class DecisionRepository:
         *,
         ticket_id: str,
         action: str,
-        verdict_shown: str,
+        verdict_shown: str | None,
         server_verdict: str,
         override_reason: str | None,
         agent: str,

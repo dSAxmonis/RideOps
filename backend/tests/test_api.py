@@ -179,6 +179,39 @@ def test_decision_stores_client_and_server_verdicts(client):
     assert body["server_verdict"] == "likely_known_issue"
 
 
+@pytest.mark.parametrize("extra", [{}, {"evidence": None}, {"evidence": {"stale_key": True}}])
+def test_null_verdict_on_p1_succeeds_without_reason(client, extra):
+    response = decide(client, "T-P1", action="escalated", verdict_shown=None, **extra)
+    assert response.status_code == 201
+    body = response.json()
+    assert body["verdict_shown"] is None
+    assert body["server_verdict"] == "ready_to_escalate"
+    assert body["override_reason"] is None
+
+
+@pytest.mark.parametrize("ticket_id", ["T-Q1", "T-R1"])
+@pytest.mark.parametrize("extra", [{}, {"evidence": None}, {"evidence": {}}])
+def test_null_verdict_cannot_bypass_override_on_non_p1(client, ticket_id, extra):
+    rejected = decide(client, ticket_id, action="escalated", verdict_shown=None, **extra)
+    assert rejected.status_code == 422
+    accepted = decide(
+        client,
+        ticket_id,
+        action="escalated",
+        verdict_shown=None,
+        override_reason="Precheck was unavailable",
+        **extra,
+    )
+    assert accepted.status_code == 201
+    assert accepted.json()["verdict_shown"] is None
+
+
+def test_omitted_verdict_with_complete_evidence_needs_no_reason(client):
+    response = decide(client, "T-R1", action="escalated", evidence=all_evidence(ROSTER))
+    assert response.status_code == 201
+    assert response.json()["server_verdict"] == "ready_to_escalate"
+
+
 def test_decision_rejects_unknown_evidence_key(client):
     response = decide(
         client,
