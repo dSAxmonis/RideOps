@@ -149,7 +149,7 @@ export function DecisionBar({
             <p className="text-[13px]">Record “{ACTION_LABEL[pending]}” on this ticket?</p>
           )}
           {showMissing ? (
-            <p role="alert" className="text-[13px] text-critical">
+            <p role="alert" className="text-[13px] text-critical-text">
               {agentError ? "Add your name. " : ""}
               {reasonError ? "Add a one-line reason." : ""}
             </p>
@@ -166,10 +166,10 @@ export function DecisionBar({
       ) : null}
 
       {!pending && showMissing && agentError ? (
-        <p role="alert" className="text-[13px] text-critical">Add your name.</p>
+        <p role="alert" className="text-[13px] text-critical-text">Add your name.</p>
       ) : null}
       {error ? (
-        <p role="alert" className="text-[13px] text-critical">{failureMessage(error)}</p>
+        <p role="alert" className="text-[13px] text-critical-text">{failureMessage(error)}</p>
       ) : null}
     </div>
   );
