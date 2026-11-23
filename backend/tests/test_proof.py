@@ -19,7 +19,15 @@ def post_decision(client, ticket_id, **body):
 
 @pytest.mark.parametrize(
     ("proof", "done"),
-    [("1234567", False), ("1 2 3 4 5 6 7", False), ("        ", False), ("12345678", True)],
+    [
+        ("1234567", False),
+        ("1 2 3 4 5 6 7", False),
+        ("        ", False),
+        ("aaaaaaaa", False),
+        ("abababab", False),
+        ("........", False),
+        ("12345678", True),
+    ],
 )
 def test_item_done_needs_eight_non_space_chars(client, proof, done):
     body = post_precheck(client, "T-R1", {"shift_date_time": proof}).json()
