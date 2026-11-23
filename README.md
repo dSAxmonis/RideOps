@@ -2,7 +2,7 @@
 
 An internal tool that helps an L1 support agent decide whether a ticket really needs engineering, before escalating it.
 
-**Live demo:** https://rideops-precheck.vercel.app (access code shared with the submission)
+**Live demo:** https://rideops-precheck.vercel.app (no login; the first load can take about a minute while the free server wakes)
 
 ## Who it is for
 
@@ -20,11 +20,11 @@ L1 support agents at RideOps, a fictional employee transport company. The suppor
 
 ```text
 Browser -> Next.js web app -> FastAPI -> tickets CSV (read-only)
-           (session, proxy)          -> SQLite or Postgres (agent decisions)
+           (server proxy)            -> SQLite or Postgres (agent decisions)
 ```
 
 - `backend/`: FastAPI service with the check, replay and weekly metrics.
-- `web/`: Next.js queue, ticket workspace and Impact page. The access code stays server-side in an encrypted session cookie.
+- `web/`: Next.js queue, ticket workspace and Impact page. Its server proxy holds the API code, so the browser never sees it.
 - Verdicts use only fields known at triage and outcomes closed before the ticket was created.
 - The check is advisory. P1 tickets are never held, and agents can override any hold by giving a reason.
 
@@ -47,11 +47,11 @@ Web, in a second terminal:
 ```bash
 cd web
 npm ci
-cp .env.example .env.local   # then set SESSION_SECRET
+cp .env.example .env.local   # then set the same ACCESS_CODE
 npm run dev
 ```
 
-Open <http://localhost:3000> and sign in with your `ACCESS_CODE`.
+Open <http://localhost:3000>.
 
 ## Environment variables
 
@@ -61,7 +61,7 @@ Open <http://localhost:3000> and sign in with your `ACCESS_CODE`.
 | API | `RIDEOPS_DATA_PATH` | Absolute path to the tickets CSV |
 | API | `DATABASE_URL` | SQLite by default, or a `postgresql://` URL |
 | Web | `API_BASE_URL` | API base URL, without `/api/v1` |
-| Web | `SESSION_SECRET` | At least 32 characters; encrypts the session cookie |
+| Web | `ACCESS_CODE` | Same value as the API; used only by the server proxy |
 
 ## Tests
 
@@ -73,7 +73,7 @@ cd web && npm test && npm run lint && npm run typecheck
 ## Deploy notes
 
 - API: `render.yaml` defines a Docker service. Add the CSV as a Render secret file and set `ACCESS_CODE` in the dashboard.
-- Web: deploy `web/` to a Next.js host and set `API_BASE_URL` and `SESSION_SECRET` as server-side variables.
+- Web: deploy `web/` to a Next.js host and set `API_BASE_URL` and `ACCESS_CODE` as server-side variables.
 - The default free-tier SQLite path is temporary. Set a Postgres `DATABASE_URL` to keep decisions across restarts.
 
 ## Known limits
@@ -82,4 +82,4 @@ cd web && npm test && npm run lint && npm run typecheck
 - Engineering effort and queue time are not in the data, so any hours saved are assumptions.
 - The missing-information verdict has not been backtested.
 - Ticket descriptions are short templates, so similar-ticket matches are thin evidence.
-- One shared access code is enough for a demo but not for production. Production would need per-user sign-in.
+- The demo is open to anyone with the link. A production version would need per-user sign-in.
