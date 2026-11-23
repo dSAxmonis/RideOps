@@ -12,6 +12,7 @@ from app.domain.models import (
     TriageView,
     Verdict,
 )
+from app.domain.playbooks import PLAYBOOKS, Playbook
 from app.services.checklist import (
     ChecklistState,
     blank_state,
@@ -19,6 +20,7 @@ from app.services.checklist import (
     items_for,
     missing_required,
 )
+from app.services.known_issues import KnownIssue
 from app.services.retrieval import KnowledgeBase, Match
 
 THIN_EVIDENCE_NOTE = (
@@ -83,6 +85,8 @@ class PrecheckResult:
     checklist: list[ChecklistState]
     similar: list[Match]
     suggested_action: str
+    known_issue: KnownIssue | None
+    playbook: Playbook
     override_allowed: bool = True
 
 
@@ -228,6 +232,12 @@ def run_precheck(
     if rule in {Rule.MISSING_EVIDENCE, Rule.NO_HOLD_SIGNAL} and has_l1_hint(signals, policy):
         reasons.insert(1, L1_HINT)
         suggested_action += " Optional: try a quick config or how-to check at L1."
+    known_issue = knowledge.known_issues.lookup(view.category, view.description, view.created_at)
+    if known_issue:
+        reasons.append(
+            f"Known issue {known_issue.id}: {known_issue.duplicate_count} prior duplicates "
+            "on this description. Shown for reference; it does not change the verdict."
+        )
     if note:
         reasons.append("Agent note received; it is not used in scoring.")
 
@@ -240,4 +250,6 @@ def run_precheck(
         checklist=checklist,
         similar=matches[: policy.top_k],
         suggested_action=suggested_action,
+        known_issue=known_issue,
+        playbook=PLAYBOOKS[view.category],
     )

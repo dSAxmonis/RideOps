@@ -16,6 +16,8 @@ from app.domain.schemas import (
     ChecklistEntry,
     DecisionRequest,
     DecisionResponse,
+    KnownIssueRef,
+    PlaybookView,
     PrecheckRequest,
     PrecheckResponse,
     SimilarTicket,
@@ -127,6 +129,17 @@ def precheck(
             for m in result.similar
         ],
         suggested_action=result.suggested_action,
+        known_issue=(
+            KnownIssueRef(
+                id=result.known_issue.id,
+                title=result.known_issue.title,
+                duplicate_count=result.known_issue.duplicate_count,
+                last_seen=result.known_issue.last_seen,
+            )
+            if result.known_issue
+            else None
+        ),
+        playbook=PlaybookView(title=result.playbook.title, steps=list(result.playbook.steps)),
     )
 
 

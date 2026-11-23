@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from app.api.deps import AppState, ReportNotReady
-from app.api.routes import health, metrics, tickets
+from app.api.routes import health, known_issues, metrics, tickets
 from app.config import Settings
 from app.repositories.decisions import DecisionRepository, build_engine
 from app.services.ingest import DataLoadError
@@ -49,6 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(tickets.router, prefix=API_PREFIX)
     app.include_router(metrics.router, prefix=API_PREFIX)
+    app.include_router(known_issues.router, prefix=API_PREFIX)
     return app
 
 

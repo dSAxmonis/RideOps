@@ -67,6 +67,27 @@ class SimilarTicket(BaseModel):
     closed_at: datetime
 
 
+class KnownIssueRef(BaseModel):
+    id: str
+    title: str
+    duplicate_count: int
+    last_seen: datetime
+
+
+class KnownIssueItem(KnownIssueRef):
+    category: str
+
+
+class KnownIssueList(BaseModel):
+    items: list[KnownIssueItem]
+
+
+class PlaybookView(BaseModel):
+    title: str
+    steps: list[str]
+    draft: Literal[True] = True
+
+
 class PrecheckResponse(BaseModel):
     ticket_id: str
     verdict: Verdict
@@ -75,6 +96,8 @@ class PrecheckResponse(BaseModel):
     checklist: list[ChecklistEntry]
     similar: list[SimilarTicket]
     suggested_action: str
+    known_issue: KnownIssueRef | None
+    playbook: PlaybookView
     override_allowed: Literal[True] = True
 
 
