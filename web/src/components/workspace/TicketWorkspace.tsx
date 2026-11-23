@@ -15,12 +15,15 @@ const PROOF_DEBOUNCE_MS = 500;
 
 function TicketDetails({ ticket }: { ticket: Ticket }) {
   const fields: [string, string][] = [
-    ["Client", `${ticket.client_name ?? "n/a"}${ticket.client_tier ? ` (${ticket.client_tier})` : ""}`],
+    ["Client", ticket.client_name ?? "n/a"],
     ["Category", ticket.category ?? "n/a"],
-    ["Channel", ticket.channel ?? "n/a"],
-    ["Agent", ticket.assigned_agent ?? "Unassigned"],
     ["Status", humanize(ticket.status)],
     ["Created", formatDateTime(ticket.created_at)],
+  ];
+  const more: [string, string][] = [
+    ["Client tier", ticket.client_tier ?? "n/a"],
+    ["Channel", ticket.channel ?? "n/a"],
+    ["Agent", ticket.assigned_agent ?? "Unassigned"],
     ["Sent to engineering", ticket.escalated_to_eng ? "Yes" : "No"],
   ];
   // Post-triage fields are null on open tickets, so these rows appear only on history.
@@ -36,23 +39,32 @@ function TicketDetails({ ticket }: { ticket: Ticket }) {
     ["CSAT", ticket.csat_score === null ? null : String(ticket.csat_score)],
   ];
   for (const [label, value] of optional) {
-    if (value !== null) fields.push([label, value]);
+    if (value !== null) more.push([label, value]);
   }
+  const list = (rows: [string, string][]) => (
+    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-2.5">
+      {rows.map(([label, value]) => (
+        <div key={label} className="contents">
+          <dt className="text-ink-2">{label}</dt>
+          <dd className="text-right break-words">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
   return (
-    <article className="border border-line bg-surface p-3">
+    <article className="card">
       <div className="flex items-center gap-2">
         <PriorityBadge priority={ticket.priority} />
-        <h1 className="font-mono text-sm font-semibold">{ticket.ticket_id}</h1>
+        <span className="font-mono text-[13px] text-ink-2">{ticket.ticket_id}</span>
       </div>
-      <p className="mt-2 text-[15px] break-words whitespace-pre-wrap">{ticket.description || "No description"}</p>
-      <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-0.5 border-t border-line pt-2 text-[13px]">
-        {fields.map(([label, value]) => (
-          <div key={label} className="contents">
-            <dt className="text-ink-2">{label}</dt>
-            <dd className="break-words">{value}</dd>
-          </div>
-        ))}
-      </dl>
+      <h1 className="mt-3 text-2xl leading-tight font-medium tracking-tight break-words">
+        {ticket.description || "No description"}
+      </h1>
+      <div className="mt-5 border-t border-line pt-4">{list(fields)}</div>
+      <details className="disclosure mt-4 border-t border-line pt-3">
+        <summary>More details</summary>
+        <div className="mt-3">{list(more)}</div>
+      </details>
     </article>
   );
 }
@@ -105,7 +117,7 @@ function CheckColumn({ ticket }: { ticket: Ticket }) {
   const verdict = precheck.isError ? null : (precheck.data?.verdict ?? null);
   const noActionNeeded = recorded === null && (isTicketClosed(ticket.status) || ticket.escalated_to_eng);
   const actions = noActionNeeded ? (
-    <p role="status" className="border border-line bg-surface px-3 py-2 text-ink-2">
+    <p role="status" className="card text-ink-2">
       {ticket.escalated_to_eng ? "Already with engineering." : "This ticket is closed."} No action needed.
     </p>
   ) : (
@@ -123,10 +135,10 @@ function CheckColumn({ ticket }: { ticket: Ticket }) {
   );
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-        <h2 className="text-sm font-semibold">Pre-Escalation Check</h2>
-        <p className="text-xs text-ink-2">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2 px-1">
+        <h2 className="card-title">Pre-Escalation Check</h2>
+        <p className="text-[13px] text-ink-2">
           {precheck.data?.mode === "enforce"
             ? "Enforce: missing proof needs a logged reason. P1s are never gated."
             : "Monitor: advice is logged and nothing is gated."}
@@ -159,8 +171,9 @@ function CheckColumn({ ticket }: { ticket: Ticket }) {
         </QueryBoundary>
       )}
 
-      <div className="border border-line bg-surface px-3 py-2">
-        <label htmlFor="precheck-note" className="mb-1 block text-xs font-semibold text-ink-2">
+      <details className="disclosure card">
+        <summary>Add a note (optional)</summary>
+        <label htmlFor="precheck-note" className="sr-only">
           Note for the check (optional)
         </label>
         <textarea
@@ -169,9 +182,9 @@ function CheckColumn({ ticket }: { ticket: Ticket }) {
           maxLength={1000}
           value={note}
           onChange={(event) => setNote(event.target.value)}
-          className="w-full rounded border border-line bg-surface px-2 py-1"
+          className="mt-2 w-full rounded-xl border border-line bg-surface px-3 py-2"
         />
-      </div>
+      </details>
 
       {fastPath ? null : actions}
     </div>
@@ -184,14 +197,14 @@ export function TicketWorkspace({ id }: { id: string }) {
     queryFn: ({ signal }) => fetchTicket(id, signal),
   });
   return (
-    <div className="space-y-2">
-      <nav aria-label="Back" className="flex gap-3 text-[13px] text-ink-2">
+    <div className="space-y-4">
+      <nav aria-label="Back" className="flex gap-4 text-ink-2">
         <Link href="/burndown" className="hover:text-ink">← Burn-down</Link>
         <Link href="/queue" className="hover:text-ink">← Queue</Link>
       </nav>
       <QueryBoundary query={ticket} loading={<LoadingRows rows={8} />}>
         {(data) => (
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-start">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
             <TicketDetails ticket={data} />
             <CheckColumn key={data.ticket_id} ticket={data} />
           </div>

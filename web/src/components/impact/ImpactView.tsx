@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { fetchBacktest, fetchLiveMetrics, fetchWeekly, isWakingError } from "@/lib/api";
 import type { Backtest, BacktestRun, LiveMetrics, WeekMetrics } from "@/lib/contract";
 import { formatRate, humanize, toPercentSeries } from "@/lib/domain";
@@ -12,7 +12,7 @@ import type { TrendPoint } from "@/components/impact/TrendChart";
 
 const TrendChart = dynamic(() => import("@/components/impact/TrendChart"), {
   ssr: false,
-  loading: () => <div className="h-[150px] animate-pulse bg-raised" />,
+  loading: () => <div className="h-[150px] animate-pulse rounded-xl bg-raised" />,
 });
 
 const percent = (value: number) => `${value.toFixed(value >= 10 ? 0 : 1)}%`;
@@ -73,14 +73,14 @@ function TrendPanel({ weeks, series, height }: { weeks: WeekMetrics[]; series: S
   const points = seriesPoints(weeks, series);
   const latest = [...points].reverse().find((point) => !point.partial && point.value !== null);
   return (
-    <figure className="min-w-0 border border-line bg-surface p-3">
-      <figcaption className="mb-1 flex items-start justify-between gap-2">
+    <figure className="card min-w-0">
+      <figcaption className="mb-3 flex items-start justify-between gap-2">
         <span>
-          <span className="block font-semibold">{series.title}</span>
-          <span className="block text-xs text-ink-2">{series.hint}</span>
+          <span className="card-title block">{series.title}</span>
+          <span className="block text-[13px] text-ink-2">{series.hint}</span>
         </span>
         <span className="text-right">
-          <span className="block text-lg leading-tight font-semibold tabular-nums">
+          <span className="block text-2xl leading-tight font-medium tracking-tight tabular-nums">
             {latest?.value != null ? series.format(latest.value) : "n/a"}
           </span>
           <span className="block text-xs text-ink-2">last full week</span>
@@ -99,9 +99,9 @@ function DataTable({ weeks }: { weeks: WeekMetrics[] }) {
   const all = [...OUTCOMES, ...GUARDRAILS];
   const columns = all.map((series) => seriesPoints(weeks, series));
   return (
-    <details className="border border-line bg-surface">
-      <summary className="cursor-pointer px-3 py-2 font-medium">Weekly data table</summary>
-      <div className="overflow-x-auto">
+    <details className="disclosure card">
+      <summary>Weekly data table</summary>
+      <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[760px] text-right text-[13px] tabular-nums">
           <thead>
             <tr className="border-y border-line text-xs text-ink-2">
@@ -152,14 +152,14 @@ function Stat({
   flagged?: boolean;
 }) {
   return (
-    <div className="border border-line bg-surface p-3">
-      <p className="flex items-center gap-1 text-xs font-semibold text-ink-2">
+    <div className="card">
+      <p className="flex items-center gap-1 text-ink-2">
         {flagged ? <Icon name="alert" className="text-critical" /> : null}
         {label}
         {flagged ? <span className="sr-only">(needs attention)</span> : null}
       </p>
-      <p className="text-xl font-semibold tabular-nums">{value}</p>
-      <p className="text-xs text-ink-2">{note}</p>
+      <p className="mt-3 text-3xl font-medium tracking-tight tabular-nums">{value}</p>
+      <p className="mt-1 text-[13px] text-ink-2">{note}</p>
     </div>
   );
 }
@@ -214,36 +214,24 @@ export function BacktestResults({ data }: { data: Backtest }) {
   ];
   const verdictKeys = [...new Set(runs.flatMap(({ run }) => Object.keys(run.flagged_by_verdict)))];
   return (
-    <div className="space-y-2">
-      <div role="note" className="border-l-2 border-warning bg-surface px-3 py-2">
-        <p className="flex items-center gap-1.5 text-[15px] font-semibold">
-          <Icon name="alert" className="text-warning" />
-          {resultLabel(data.result_label)}
-        </p>
-        <p className="mt-0.5">{data.methodology_note}</p>
-        <p className="mt-1 text-xs text-ink-2">
-          Window {windowText(data)}. Policy {data.policy_version ?? "n/a"}.
-          {data.clean_holdout ? "" : " Do not read this as a clean holdout."}
-        </p>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
           label="Fixed bugs delayed"
           value={ofTotal(delayed?.count, delayed?.fixed_total)}
-          note={`Real bugs the check would have held (${rate(delayed?.rate)}). This is the cost of the tool.`}
+          note={`Replay only (${rate(delayed?.rate)})`}
           flagged={(delayed?.count ?? 0) > 0}
         />
         <Stat
           label="P1 misses"
           value={ofTotal(data.p1?.misses, data.p1?.total)}
-          note="P1s given anything other than the fast path. The target is 0."
+          note="The target is 0"
           flagged={(data.p1?.misses ?? 0) > 0}
         />
         <Stat
           label="Known-issue precision"
           value={rate(knownIssue?.precision)}
-          note={`${lift(knownIssue?.lift)} lift over a ${rate(knownIssue?.base_rate)} base rate.`}
+          note={`${lift(knownIssue?.lift)} lift over ${rate(knownIssue?.base_rate)}`}
         />
         <Stat
           label={data.advisory_flags ? "Avoidable among flags" : "Avoidable caught"}
@@ -254,15 +242,32 @@ export function BacktestResults({ data }: { data: Backtest }) {
           }
           note={
             data.advisory_flags
-              ? "Shown as warnings. None of these tickets is delayed."
-              : `Of tickets held. ${rate(data.held_for_review?.recall_avoidable)} of all avoidable escalations.`
+              ? "Warnings only, no delay"
+              : `${rate(data.held_for_review?.recall_avoidable)} of all avoidable`
           }
         />
       </div>
 
-      <div className="overflow-x-auto border border-line bg-surface">
+      <div role="note" className="flex items-start gap-2.5 rounded-[18px] bg-serious-soft px-4 py-3">
+        <Icon name="alert" className="mt-0.5 text-serious" />
+        <div className="min-w-0 flex-1">
+          <p className="font-medium">{resultLabel(data.result_label)}</p>
+          <p className="text-[13px] text-ink-2">
+            Window {windowText(data)}. Policy {data.policy_version ?? "n/a"}.
+            {data.clean_holdout ? "" : " Do not read this as a clean holdout."}
+          </p>
+          <details className="disclosure mt-1.5 text-[13px]">
+            <summary>How to read this</summary>
+            <p className="mt-1">{data.methodology_note}</p>
+          </details>
+        </div>
+      </div>
+
+      <details className="disclosure card">
+        <summary>Compare policy versions</summary>
+      <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[520px] text-right text-[13px] tabular-nums">
-          <caption className="px-3 pt-2 text-left text-xs font-semibold text-ink-2">Revised versus original</caption>
+          <caption className="sr-only">Revised versus original</caption>
           <thead>
             <tr className="border-b border-line text-xs text-ink-2">
               <th scope="col" className="px-3 py-1 text-left font-medium">Measure</th>
@@ -291,16 +296,17 @@ export function BacktestResults({ data }: { data: Backtest }) {
           </tbody>
         </table>
       </div>
+      </details>
 
       {data.assumptions.length > 0 ? (
-        <div className="border border-line bg-surface px-3 py-2">
-          <h3 className="mb-1 text-xs font-semibold text-ink-2">Assumptions</h3>
-          <ul className="list-disc space-y-0.5 pl-4">
+        <details className="disclosure card">
+          <summary>Assumptions</summary>
+          <ul className="mt-2 list-disc space-y-1 pl-4 text-ink-2">
             {data.assumptions.map((assumption) => (
               <li key={assumption}>{assumption}</li>
             ))}
           </ul>
-        </div>
+        </details>
       ) : null}
     </div>
   );
@@ -312,32 +318,46 @@ const BACKTEST_RETRY_DELAY_MS = 3_000;
 
 export function LivePanel({ data }: { data: LiveMetrics }) {
   return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
-        <Stat label="Open now" value={data.open_now} note={`${data.open_at_snapshot} at snapshot`} />
-        <Stat label="Cleared" value={data.cleared} note="Recorded in this tool" />
-        <Stat
-          label="Decisions"
-          value={data.decisions_total}
-          note={`${data.by_action.escalated} escalated, ${data.by_action.resolved_at_l1} resolved, ${data.by_action.requested_info} info`}
-        />
-        <Stat label="Overrides" value={data.overrides} note={`${rate(data.override_rate)} of flagged decisions`} />
-        <Stat label="Escalations avoided" value={data.escalations_avoided} note="As recorded, not verified" />
+    <section aria-label="Live activity" className="hero-card h-full">
+      <h2 className="card-title">Live Activity</h2>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        {[
+          { label: "Open now", value: data.open_now },
+          { label: "Cleared", value: data.cleared },
+          { label: "Decisions", value: data.decisions_total },
+          { label: "Overrides", value: data.overrides },
+        ].map((tile) => (
+          <div key={tile.label} className="glass-tile">
+            <p className="text-2xl font-medium tabular-nums">{tile.value}</p>
+            <p className="text-[13px] text-white/80">{tile.label}</p>
+          </div>
+        ))}
       </div>
-      <p
-        role="status"
-        className={`flex items-center gap-1.5 border-l-2 bg-surface px-3 py-1.5 text-[13px] ${data.durable ? "border-good" : "border-warning"}`}
-      >
-        <Icon name={data.durable ? "check" : "alert"} className={data.durable ? "text-good" : "text-warning"} />
+      <p className="mt-3 text-[13px] text-white/85">Recorded activity, not proven outcomes.</p>
+      <p role="status" className="mt-1 flex items-center gap-1.5 text-[13px] text-white/85">
+        <Icon name={data.durable ? "check" : "alert"} />
         {data.durable
           ? `Storage is durable (${data.storage ?? "unknown"}).`
-          : `Storage is not durable (${data.storage ?? "unknown"}). This activity can reset when the server restarts.`}
+          : `Storage is not durable (${data.storage ?? "unknown"}).`}
       </p>
-    </div>
+    </section>
   );
 }
 
+const TABS = [
+  { id: "overview", label: "Overview" },
+  { id: "trends", label: "Trends" },
+  { id: "replay", label: "Replay" },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
+
+function latestValue(weeks: WeekMetrics[], series: Series) {
+  const point = [...seriesPoints(weeks, series)].reverse().find((item) => !item.partial && item.value !== null);
+  return point?.value != null ? series.format(point.value) : "n/a";
+}
+
 export function ImpactView() {
+  const [tab, setTab] = useState<TabId>("overview");
   const live = useQuery({
     queryKey: ["metrics", "live"],
     queryFn: ({ signal }) => fetchLiveMetrics(signal),
@@ -349,57 +369,76 @@ export function ImpactView() {
     queryFn: ({ signal }) => fetchBacktest(signal),
     retry: (failures, error) => isWakingError(error) && failures < BACKTEST_MAX_RETRIES,
     retryDelay: BACKTEST_RETRY_DELAY_MS,
+    enabled: tab === "replay",
   });
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-base font-semibold">Impact</h1>
-        <p className="text-ink-2">Dashed segments are partial weeks and are left out of “last full week”.</p>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="page-title">Impact</h1>
+        <div role="tablist" aria-label="Impact views" className="flex gap-1 rounded-xl bg-line/70 p-1">
+          {TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === item.id}
+              onClick={() => setTab(item.id)}
+              className={`rounded-lg px-4 py-1.5 text-sm ${tab === item.id ? "bg-surface font-medium text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
       </div>
-      <section aria-labelledby="live" className="space-y-2">
-        <div>
-          <h2 id="live" className="text-sm font-semibold">Live</h2>
-          <p className="text-ink-2">Activity since launch, not proven outcomes.</p>
-        </div>
-        <QueryBoundary query={live} loading={<LoadingRows rows={2} />}>
-          {(data) => <LivePanel data={data} />}
+
+      {tab === "overview" ? (
+        <QueryBoundary query={weekly}>
+          {({ weeks }) =>
+            weeks.length === 0 ? (
+              <EmptyNotice>No weekly metrics yet.</EmptyNotice>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+                  {[OUTCOMES[0]!, OUTCOMES[1]!, GUARDRAILS[0]!, GUARDRAILS[2]!].map((series) => (
+                    <Stat key={series.key} label={series.title} value={latestValue(weeks, series)} note="Last full week" />
+                  ))}
+                </div>
+                <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
+                  <TrendPanel weeks={weeks} series={OUTCOMES[0]!} height={250} />
+                  <QueryBoundary query={live} loading={<LoadingRows rows={3} />}>
+                    {(data) => <LivePanel data={data} />}
+                  </QueryBoundary>
+                </div>
+              </div>
+            )
+          }
         </QueryBoundary>
-      </section>
-      <QueryBoundary query={weekly}>
-        {({ weeks }) =>
-          weeks.length === 0 ? (
-            <EmptyNotice>No weekly metrics yet.</EmptyNotice>
-          ) : (
-            <div className="space-y-4">
-              <section aria-labelledby="outcomes" className="space-y-2">
-                <h2 id="outcomes" className="text-sm font-semibold">Outcomes</h2>
-                <div className="grid gap-2 lg:grid-cols-2">
-                  {OUTCOMES.map((series) => (
-                    <TrendPanel key={series.key} weeks={weeks} series={series} height={190} />
+      ) : null}
+
+      {tab === "trends" ? (
+        <QueryBoundary query={weekly}>
+          {({ weeks }) =>
+            weeks.length === 0 ? (
+              <EmptyNotice>No weekly metrics yet.</EmptyNotice>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {[OUTCOMES[1]!, ...GUARDRAILS.slice(0, 3)].map((series) => (
+                    <TrendPanel key={series.key} weeks={weeks} series={series} height={170} />
                   ))}
                 </div>
-              </section>
-              <section aria-labelledby="guardrails" className="space-y-2">
-                <h2 id="guardrails" className="text-sm font-semibold">Guardrails</h2>
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                  {GUARDRAILS.map((series) => (
-                    <TrendPanel key={series.key} weeks={weeks} series={series} />
-                  ))}
-                </div>
-              </section>
-              <DataTable weeks={weeks} />
-            </div>
-          )
-        }
-      </QueryBoundary>
-      <section aria-labelledby="backtest" className="space-y-2">
-        <div>
-          <h2 id="backtest" className="text-sm font-semibold">Backtest</h2>
-          <p className="text-ink-2">The check replayed on past tickets. It estimates what would have happened and is not a live result.</p>
-        </div>
+                <p className="px-1 text-[13px] text-ink-2">Dashed lines are partial weeks.</p>
+                <DataTable weeks={weeks} />
+              </div>
+            )
+          }
+        </QueryBoundary>
+      ) : null}
+
+      {tab === "replay" ? (
         <QueryBoundary query={backtest}>{(data) => <BacktestResults data={data} />}</QueryBoundary>
-      </section>
+      ) : null}
     </div>
   );
 }

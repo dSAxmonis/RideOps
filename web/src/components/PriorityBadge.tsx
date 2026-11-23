@@ -1,12 +1,12 @@
 export function PriorityBadge({ priority }: { priority: string }) {
   const style =
     priority === "P1"
-      ? "border-critical bg-critical text-white"
+      ? "bg-critical-soft text-critical-text"
       : priority === "P2"
-        ? "border-ink-2 text-ink"
-        : "border-line text-ink-2";
+        ? "bg-serious-soft text-serious-text"
+        : "bg-raised text-ink-2";
   return (
-    <span className={`inline-block w-8 rounded-sm border text-center text-xs font-semibold tabular-nums ${style}`}>
+    <span className={`inline-block w-9 rounded-md py-0.5 text-center text-xs font-semibold tabular-nums ${style}`}>
       {priority}
     </span>
   );
