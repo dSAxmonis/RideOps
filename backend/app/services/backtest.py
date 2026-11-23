@@ -16,7 +16,12 @@ from app.domain.models import (
     TriageView,
     Verdict,
 )
-from app.services.precheck import DEFAULT_POLICY, PrecheckPolicy, run_precheck
+from app.services.precheck import (
+    DEFAULT_POLICY,
+    ORIGINAL_POLICY,
+    PrecheckPolicy,
+    run_precheck,
+)
 from app.services.retrieval import KnowledgeBase
 
 VERDICT_TARGETS: dict[Verdict, frozenset[str]] = {
@@ -28,8 +33,14 @@ VERDICT_TARGETS: dict[Verdict, frozenset[str]] = {
 ASSUMPTIONS = (
     "Checklist evidence was not recorded historically, so replay assumes it was complete.",
     "needs_info therefore cannot fire in replay and its precision is not measured.",
-    "Rule thresholds were chosen on August escalations, before September was evaluated.",
+    "Rule thresholds were chosen on August escalations and were not tuned on September.",
     "Labels are the recorded eng_outcome, including escalations still open at snapshot.",
+)
+
+METHODOLOGY_NOTE = (
+    "try_l1_fix was demoted to a non-blocking hint after its weak September precision was "
+    "seen. No threshold was tuned on September, but this design change was informed by it, "
+    "so the revised result is not a clean holdout. original_pre_change is the holdout result."
 )
 
 
@@ -37,12 +48,37 @@ def _share(numerator: int, denominator: int) -> float | None:
     return round(numerator / denominator, 4) if denominator else None
 
 
+def _lift(precision: float | None, base_rate: float | None) -> float | None:
+    return round(precision / base_rate, 2) if precision is not None and base_rate else None
+
+
 def run_backtest(
     tickets: Sequence[TicketRecord],
     knowledge: KnowledgeBase,
-    policy: PrecheckPolicy = DEFAULT_POLICY,
     start: datetime = BACKTEST_START,
     end: datetime = SNAPSHOT_AT,
+) -> dict[str, object]:
+    revised = _replay(tickets, knowledge, DEFAULT_POLICY, start, end)
+    original = _replay(tickets, knowledge, ORIGINAL_POLICY, start, end)
+    return {
+        **revised,
+        "result_label": "revised_not_clean_holdout",
+        "clean_holdout": False,
+        "methodology_note": METHODOLOGY_NOTE,
+        "original_pre_change": {
+            **original,
+            "result_label": "original_pre_change_holdout",
+            "clean_holdout": True,
+        },
+    }
+
+
+def _replay(
+    tickets: Sequence[TicketRecord],
+    knowledge: KnowledgeBase,
+    policy: PrecheckPolicy,
+    start: datetime,
+    end: datetime,
 ) -> dict[str, object]:
     cohort = sorted(
         (
@@ -63,11 +99,14 @@ def run_backtest(
         flagged = [t for t, shown in verdicts if shown is verdict]
         correct = sum(t.eng_outcome in targets for t in flagged)
         base = sum(t.eng_outcome in targets for t in cohort)
+        verdict_precision = _share(correct, len(flagged))
+        base_rate = _share(base, len(cohort))
         precision[verdict.value] = {
             "flagged": len(flagged),
             "correct": correct,
-            "precision": _share(correct, len(flagged)),
-            "base_rate": _share(base, len(cohort)),
+            "precision": verdict_precision,
+            "base_rate": base_rate,
+            "lift": _lift(verdict_precision, base_rate),
             "target_outcomes": sorted(targets),
         }
 

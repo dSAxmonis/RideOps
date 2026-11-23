@@ -244,3 +244,12 @@ def test_backtest_reports_guardrails(client):
     assert body["p1"]["misses"] == 0
     assert "count" in body["fixed_bugs_delayed"]
     assert sum(body["flagged_by_verdict"].values()) == 2
+    assert body["flagged_by_verdict"]["try_l1_fix"] == 0
+    assert body["clean_holdout"] is False
+    assert body["result_label"] == "revised_not_clean_holdout"
+    assert "not a clean holdout" in body["methodology_note"]
+    original = body["original_pre_change"]
+    assert original["clean_holdout"] is True
+    assert original["policy_version"] == "2026-11.v1"
+    assert original["escalations"] == body["escalations"]
+    assert "lift" in body["precision_by_verdict"]["likely_known_issue"]
