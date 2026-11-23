@@ -47,7 +47,7 @@ export const verdictLabel = (verdict: Verdict) => VERDICT_COPY[verdict].label;
 export function P1FastPath() {
   return (
     <section aria-label="P1 fast path" className="card flex items-start gap-3">
-      <span className="icon-tile bg-critical-soft text-critical">
+      <span className="icon-tile bg-serious-soft text-accent">
         <Icon name="bolt" />
       </span>
       <span>

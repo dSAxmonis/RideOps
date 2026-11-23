@@ -46,7 +46,7 @@ export function AppHeader() {
 
   return (
     <header>
-      <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 sm:px-8 lg:px-12">
+      <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 sm:px-6 lg:px-8">
         <Link href="/burndown" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-accent-ink">
             <Icon name="route" />

@@ -7,7 +7,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     <>
       <DataWarmup />
       <AppHeader />
-      <main className="mx-auto max-w-[1440px] px-4 pt-3 pb-10 sm:px-8 lg:px-12">{children}</main>
+      <main className="w-full px-4 pt-3 pb-10 sm:px-6 lg:px-8">{children}</main>
     </>
   );
 }

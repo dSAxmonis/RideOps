@@ -9,13 +9,14 @@ import type { TicketSummary } from "@/lib/contract";
 import { formatAge, sortQueue } from "@/lib/domain";
 import { Icon } from "@/components/Icon";
 import { PriorityBadge } from "@/components/PriorityBadge";
+import { Select } from "@/components/Select";
 import { EmptyNotice, QueryBoundary, buttonClass, primaryButtonClass } from "@/components/QueryStates";
 
 const VISIBLE_STEP = 15;
 // Ages are measured at the data pull, so they match the burn-down.
 const SNAPSHOT_MS = Date.parse("2026-09-30T23:59:00");
 const GRID =
-  "md:grid md:grid-cols-[3rem_6.5rem_minmax(0,1fr)_minmax(0,14rem)_3.5rem] md:items-center md:gap-3";
+  "md:grid md:grid-cols-[3.5rem_7rem_minmax(0,1fr)_minmax(0,18rem)_4rem] md:items-center md:gap-3";
 const controlClass = "h-10 min-w-0 rounded-xl border border-line bg-surface px-3 text-ink";
 
 const uniqueSorted = (values: (string | null)[]) =>
@@ -192,24 +193,24 @@ export function QueueView() {
             className={`${controlClass} w-full pl-9`}
           />
         </div>
-        <select aria-label="Priority" value={filters.priority ?? ""} onChange={(event) => setParams({ priority: event.target.value })} className={controlClass}>
-          <option value="">All priorities</option>
-          {["P1", "P2", "P3", "P4"].map((priority) => (
-            <option key={priority}>{priority}</option>
-          ))}
-        </select>
-        <select aria-label="Category" value={filters.category ?? ""} onChange={(event) => setParams({ category: event.target.value })} className={controlClass}>
-          <option value="">All categories</option>
-          {categories.map((category) => (
-            <option key={category}>{category}</option>
-          ))}
-        </select>
-        <select aria-label="Agent" value={filters.agent ?? ""} onChange={(event) => setParams({ agent: event.target.value })} className={controlClass}>
-          <option value="">All agents</option>
-          {agents.map((agent) => (
-            <option key={agent}>{agent}</option>
-          ))}
-        </select>
+        <Select
+          label="Priority"
+          value={filters.priority ?? ""}
+          onChange={(priority) => setParams({ priority })}
+          options={[{ value: "", label: "All priorities" }, ...["P1", "P2", "P3", "P4"].map((value) => ({ value, label: value }))]}
+        />
+        <Select
+          label="Category"
+          value={filters.category ?? ""}
+          onChange={(category) => setParams({ category })}
+          options={[{ value: "", label: "All categories" }, ...categories.map((value) => ({ value, label: value }))]}
+        />
+        <Select
+          label="Agent"
+          value={filters.agent ?? ""}
+          onChange={(agent) => setParams({ agent })}
+          options={[{ value: "", label: "All agents" }, ...agents.map((value) => ({ value, label: value }))]}
+        />
         {hasFilters ? (
           <button
             type="button"
