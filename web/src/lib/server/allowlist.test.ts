@@ -15,7 +15,7 @@ describe("resolveProxyTarget", () => {
 
   it("keeps only known query parameters", () => {
     const search = new URLSearchParams("q=late&limit=5&admin=1");
-    expect(resolveProxyTarget("GET", ["tickets"], search)?.query).toBe("?limit=5&q=late");
+    expect(resolveProxyTarget("GET", ["tickets"], search)?.query).toBe("?q=late&limit=5");
   });
 
   it.each([
