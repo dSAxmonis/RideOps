@@ -101,8 +101,8 @@ export function Select({
         onKeyDown={onKeyDown}
         className={`flex h-10 max-w-56 items-center gap-2 rounded-xl border px-3.5 text-sm font-medium transition ${
           open || filtered
-            ? "border-accent bg-serious-soft text-serious-text"
-            : "border-line bg-surface text-ink hover:border-accent hover:bg-serious-soft"
+            ? "border-accent bg-tint text-tint-text"
+            : "border-line bg-surface text-ink hover:border-accent hover:bg-tint"
         }`}
       >
         <span className="truncate">{options[selectedIndex]?.label ?? label}</span>
@@ -128,7 +128,7 @@ export function Select({
                 onPointerEnter={() => setActive(index)}
                 onClick={() => choose(index)}
                 className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl px-3 py-2 text-sm ${
-                  index === active ? "bg-serious-soft text-serious-text" : "text-ink"
+                  index === active ? "bg-tint text-tint-text" : "text-ink"
                 } ${selected ? "font-semibold" : ""}`}
               >
                 <span className="truncate">{option.label}</span>

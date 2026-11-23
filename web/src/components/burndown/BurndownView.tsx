@@ -41,7 +41,7 @@ const STATE_AFTER: Record<BacklogAction, string> = {
   reopened: "reopened",
 };
 const VERDICT_CHIP: Record<string, { label: string; tone: string }> = {
-  Fixed: { label: "Fixed", tone: "bg-accent text-accent-ink" },
+  Fixed: { label: "Fixed", tone: "bg-good-soft text-good" },
   "Insufficient info - returned to L1": { label: "Needs info", tone: "bg-serious-soft text-serious-text" },
   "Config issue - returned to L1": { label: "Config", tone: "bg-serious-soft text-serious-text" },
   "Duplicate of known issue": { label: "Duplicate", tone: "bg-serious-soft text-serious-text" },
@@ -239,9 +239,9 @@ function BacklogStatus({ data, waiting }: { data: Burndown; waiting: number }) {
   const otherVerdict = live.length - fixed - noVerdict;
   const total = Math.max(live.length, 1);
   const segments = [
-    { label: "Fixed", value: fixed, bar: "bg-teal" },
+    { label: "Fixed", value: fixed, bar: "bg-good" },
     { label: "Other verdict", value: otherVerdict, bar: "bg-warning" },
-    { label: "No verdict", value: noVerdict, bar: "bg-pale" },
+    { label: "No verdict", value: noVerdict, bar: "bg-critical" },
   ];
   return (
     <section aria-label="Backlog status" className="card space-y-4">
@@ -373,7 +373,7 @@ function BurndownContent({ data }: { data: Burndown }) {
                   type="button"
                   aria-pressed={active}
                   onClick={() => setLane(active ? null : lane.lane)}
-                  className={`card text-left transition hover:shadow-md ${active ? "bg-serious-soft ring-2 ring-accent" : ""}`}
+                  className={`card text-left transition hover:shadow-md ${active ? "bg-tint ring-2 ring-accent" : ""}`}
                 >
                   <span className="flex items-start justify-between">
                     <Icon name="folder" className="h-9 w-9 text-accent" />
