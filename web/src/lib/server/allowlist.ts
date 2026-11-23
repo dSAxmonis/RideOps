@@ -28,9 +28,13 @@ export function resolveProxyTarget(
 
   if (method === "GET") {
     if (first === "health" && segments.length === 1) return { path: "/health", query: "" };
-    if (first === "metrics" && segments.length === 2 && (second === "weekly" || second === "backtest")) {
+    if (first === "metrics" && segments.length === 2 && (second === "weekly" || second === "backtest" || second === "live")) {
       return { path: `/metrics/${second}`, query: "" };
     }
+    if (first === "backlog" && second === "burndown" && segments.length === 2) {
+      return { path: "/backlog/burndown", query: "" };
+    }
+    if (first === "known-issues" && segments.length === 1) return { path: "/known-issues", query: "" };
     if (first === "tickets" && segments.length === 1) {
       return { path: "/tickets", query: allowedQuery(search, TICKET_QUERY_PARAMS) };
     }
@@ -49,6 +53,16 @@ export function resolveProxyTarget(
     (third === "precheck" || third === "decisions")
   ) {
     return { path: `/tickets/${second}/${third}`, query: "" };
+  }
+  if (
+    method === "POST" &&
+    first === "backlog" &&
+    segments.length === 3 &&
+    second &&
+    TICKET_ID.test(second) &&
+    third === "actions"
+  ) {
+    return { path: `/backlog/${second}/actions`, query: "" };
   }
   return null;
 }

@@ -66,6 +66,8 @@ export const checklistItemSchema = z.object({
   label: z.string(),
   required: z.boolean(),
   done: z.boolean(),
+  proof: z.string().nullish().transform((value) => value ?? ""),
+  proof_hint: z.string().nullish().transform((value) => value ?? ""),
 });
 export type ChecklistItem = z.infer<typeof checklistItemSchema>;
 
@@ -79,6 +81,21 @@ export const similarTicketSchema = z.object({
 });
 export type SimilarTicket = z.infer<typeof similarTicketSchema>;
 
+export const knownIssueMatchSchema = z.object({
+  id: z.union([z.string(), z.number()]).transform(String),
+  title: z.string(),
+  duplicate_count: z.number(),
+  last_seen: nullableString,
+});
+export type KnownIssueMatch = z.infer<typeof knownIssueMatchSchema>;
+
+export const playbookSchema = z.object({
+  title: z.string(),
+  steps: z.array(z.string()),
+  draft: z.boolean(),
+});
+export type Playbook = z.infer<typeof playbookSchema>;
+
 export const precheckResponseSchema = z.object({
   ticket_id: z.string(),
   verdict: verdictSchema,
@@ -88,11 +105,16 @@ export const precheckResponseSchema = z.object({
   similar: z.array(similarTicketSchema),
   suggested_action: z.string().nullish().transform((value) => value ?? ""),
   override_allowed: z.literal(true),
+  known_issue: knownIssueMatchSchema.nullish().transform((value) => value ?? null),
+  playbook: playbookSchema.nullish().transform((value) => value ?? null),
 });
 export type PrecheckResponse = z.infer<typeof precheckResponseSchema>;
 
+/** Proof text per checklist key. */
+export type Evidence = Record<string, string>;
+
 export interface PrecheckRequest {
-  evidence: Record<string, boolean>;
+  evidence: Evidence;
   note?: string;
 }
 
@@ -101,7 +123,7 @@ export interface DecisionRequest {
   /** Null only when the check could not be loaded, so no verdict was shown. */
   verdict_shown: Verdict | null;
   /** The server recomputes the verdict from this map. */
-  evidence: Record<string, boolean>;
+  evidence: Evidence;
   override_reason?: string;
   agent: string;
 }
@@ -171,3 +193,90 @@ export const backtestSchema = backtestRunSchema.extend({
   original_pre_change: backtestRunSchema.nullish(),
 });
 export type Backtest = z.infer<typeof backtestSchema>;
+
+export const BACKLOG_ACTIONS = ["cleared", "waiting_client", "reopened"] as const;
+export const backlogActionSchema = z.enum(BACKLOG_ACTIONS);
+export type BacklogAction = z.infer<typeof backlogActionSchema>;
+
+export interface BacklogActionRequest {
+  action: BacklogAction;
+  agent: string;
+  note?: string;
+}
+
+export const backlogActionResponseSchema = z.looseObject({});
+
+export const burndownLaneSchema = z.object({
+  lane: z.string(),
+  label: z.string(),
+  count: z.number(),
+  owner: nullableString,
+  next_action: nullableString,
+});
+export type BurndownLane = z.infer<typeof burndownLaneSchema>;
+
+export const burndownItemSchema = z.object({
+  ticket_id: z.string(),
+  priority: z.string().transform((value) => value.trim().toUpperCase()),
+  client_name: nullableString,
+  category: nullableString,
+  description: z.string().nullish().transform((value) => value ?? ""),
+  assigned_agent: nullableString,
+  status: z.string(),
+  eng_outcome: nullableString,
+  age_hours: z.number(),
+  handoffs: nullableNumber,
+  reopen_count: nullableNumber,
+  lane: z.string(),
+  owner: nullableString,
+  next_action: nullableString,
+  status_mismatch: z.boolean(),
+  state: z.string().nullish().transform((value) => value ?? "open"),
+  last_action_at: nullableString,
+});
+export type BurndownItem = z.infer<typeof burndownItemSchema>;
+
+export const burndownSchema = z.object({
+  snapshot_at: nullableString,
+  open_at_snapshot: z.number(),
+  open_now: z.number(),
+  cleared: z.number(),
+  lanes: z.array(burndownLaneSchema),
+  items: z.array(burndownItemSchema),
+});
+export type Burndown = z.infer<typeof burndownSchema>;
+
+export const liveMetricsSchema = z.object({
+  open_at_snapshot: z.number(),
+  open_now: z.number(),
+  cleared: z.number(),
+  decisions_total: z.number(),
+  by_action: z.looseObject({
+    escalated: z.number().default(0),
+    resolved_at_l1: z.number().default(0),
+    requested_info: z.number().default(0),
+  }),
+  overrides: z.number(),
+  override_rate: nullableNumber,
+  escalations_avoided: z.number(),
+  by_lane_cleared: z.record(z.string(), z.number()).default({}),
+  by_day: z
+    .array(z.object({ day: z.string(), decisions: z.number(), cleared: z.number() }))
+    .default([]),
+  storage: nullableString,
+  durable: z.boolean(),
+});
+export type LiveMetrics = z.infer<typeof liveMetricsSchema>;
+
+export const knownIssuesSchema = z.object({
+  items: z.array(
+    z.object({
+      id: z.union([z.string(), z.number()]).transform(String),
+      title: z.string(),
+      category: nullableString,
+      duplicate_count: z.number(),
+      last_seen: nullableString,
+    }),
+  ),
+});
+export type KnownIssues = z.infer<typeof knownIssuesSchema>;

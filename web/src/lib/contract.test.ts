@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   backtestSchema,
+  burndownSchema,
+  liveMetricsSchema,
   precheckResponseSchema,
   ticketListSchema,
   ticketSchema,
@@ -78,6 +80,36 @@ describe("contract", () => {
   it("rejects a backtest without its result label or methodology note", () => {
     expect(backtestSchema.safeParse({ ...backtest, result_label: undefined }).success).toBe(false);
     expect(backtestSchema.safeParse({ ...backtest, methodology_note: undefined }).success).toBe(false);
+  });
+
+  it("parses burn-down, live metrics and the extended precheck", () => {
+    const parsed = burndownSchema.parse({
+      snapshot_at: "2026-01-31T00:00:00Z",
+      open_at_snapshot: 2,
+      open_now: 1,
+      cleared: 1,
+      lanes: [{ lane: "confirm_fix", label: "Confirm fix", count: 1, owner: "L1", next_action: "Confirm" }],
+      items: [{
+        ticket_id: "T-1", priority: "p2", client_name: "Example", category: "routing", description: "Sample",
+        assigned_agent: "Agent", status: "Open", eng_outcome: "Fixed", age_hours: 5, handoffs: 1, reopen_count: 0,
+        lane: "confirm_fix", owner: "L1", next_action: "Confirm", status_mismatch: true, state: null, last_action_at: null,
+      }],
+    });
+    expect(parsed.items[0]?.priority).toBe("P2");
+    expect(parsed.items[0]?.state).toBe("open");
+    expect(liveMetricsSchema.safeParse({
+      open_at_snapshot: 2, open_now: 1, cleared: 1, decisions_total: 0, by_action: {}, overrides: 0,
+      override_rate: null, escalations_avoided: 0, by_lane_cleared: {}, by_day: [], storage: "sqlite", durable: false,
+    }).success).toBe(true);
+    const precheck = precheckResponseSchema.parse({
+      ticket_id: "T-1", verdict: "needs_info", confidence_band: "low", reasons: [],
+      checklist: [{ key: "k", label: "L", required: true, done: false, proof: null, proof_hint: "Hint" }],
+      similar: [], suggested_action: "", override_allowed: true,
+      known_issue: { id: 7, title: "Sample", duplicate_count: 3, last_seen: null },
+      playbook: { title: "Draft", steps: ["One"], draft: true },
+    });
+    expect(precheck.known_issue?.id).toBe("7");
+    expect(precheck.checklist[0]?.proof).toBe("");
   });
 
   it("keeps parsing the retired try_l1_fix verdict", () => {

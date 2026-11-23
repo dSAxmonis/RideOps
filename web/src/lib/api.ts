@@ -1,11 +1,16 @@
 import type { z } from "zod";
 import {
+  backlogActionResponseSchema,
   backtestSchema,
+  burndownSchema,
   decisionResponseSchema,
+  knownIssuesSchema,
+  liveMetricsSchema,
   precheckResponseSchema,
   ticketListSchema,
   ticketSchema,
   weeklyMetricsSchema,
+  type BacklogActionRequest,
   type DecisionRequest,
   type PrecheckRequest,
   type TicketSummary,
@@ -138,3 +143,18 @@ export const fetchWeekly = (signal?: AbortSignal) =>
 
 export const fetchBacktest = (signal?: AbortSignal) =>
   request("metrics/backtest", backtestSchema, { signal });
+
+export const fetchBurndown = (signal?: AbortSignal) =>
+  request("backlog/burndown", burndownSchema, { signal });
+
+export const submitBacklogAction = (id: string, body: BacklogActionRequest) =>
+  request(`backlog/${encodeURIComponent(id)}/actions`, backlogActionResponseSchema, {
+    method: "POST",
+    body,
+  });
+
+export const fetchLiveMetrics = (signal?: AbortSignal) =>
+  request("metrics/live", liveMetricsSchema, { signal });
+
+export const fetchKnownIssues = (signal?: AbortSignal) =>
+  request("known-issues", knownIssuesSchema, { signal });
