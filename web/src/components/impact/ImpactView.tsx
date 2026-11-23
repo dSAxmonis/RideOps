@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
-import { fetchBacktest, fetchWeekly } from "@/lib/api";
+import { fetchBacktest, fetchWeekly, isWakingError } from "@/lib/api";
 import type { Backtest, BacktestRun, WeekMetrics } from "@/lib/contract";
 import { formatRate, humanize, toPercentSeries } from "@/lib/domain";
 import { Icon } from "@/components/Icon";
@@ -292,9 +292,18 @@ export function BacktestResults({ data }: { data: Backtest }) {
   );
 }
 
+// The replay can take over a minute on a cold, low-CPU host.
+const BACKTEST_MAX_RETRIES = 40;
+const BACKTEST_RETRY_DELAY_MS = 3_000;
+
 export function ImpactView() {
   const weekly = useQuery({ queryKey: ["metrics", "weekly"], queryFn: ({ signal }) => fetchWeekly(signal) });
-  const backtest = useQuery({ queryKey: ["metrics", "backtest"], queryFn: ({ signal }) => fetchBacktest(signal) });
+  const backtest = useQuery({
+    queryKey: ["metrics", "backtest"],
+    queryFn: ({ signal }) => fetchBacktest(signal),
+    retry: (failures, error) => isWakingError(error) && failures < BACKTEST_MAX_RETRIES,
+    retryDelay: BACKTEST_RETRY_DELAY_MS,
+  });
 
   return (
     <div className="space-y-4">
