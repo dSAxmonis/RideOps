@@ -1,35 +1,59 @@
 # RideOps Pre-Escalation Check
 
-An internal tool that helps L1 support agents clear tickets that already have an engineering verdict, then decide whether new tickets really need engineering.
+An internal tool for L1 support agents. It clears tickets that already have an engineering verdict, then checks whether each new ticket really needs engineering.
 
-**Live demo:** https://rideops-precheck.vercel.app (no login; the first load can take about a minute while the free server wakes)
+**Live demo:** <https://rideops-precheck.vercel.app> (no login needed)
 
 ## The result
 
-- 34 of the 48 tickets open at the 30 Sep snapshot (71%) already have an engineering verdict, and 19 of those are still labelled with Engineering. This is a one-time cleanup opportunity that must be validated. If clients confirm the 12 marked Fixed, open tickets would move from 48 to 36.
-- 52.1% of escalations (253 of 486) came back without an engineering fix.
-- The 7-day average of open tickets rose from 29.0 (25-31 Jul) to 49.9 (24-30 Sep). Intake rose about 40%, so this tool alone cannot restore July levels.
-- Scenario estimate for the check: 10-19% fewer open tickets. It has not been measured live.
-- September replay of 189 escalations: policy v2 held 25 and delayed 10 of 78 true bugs. Policy v3 makes history a warning, so it delays 0 of 78 by design and still flags the same 15 avoidable tickets, with 0 of 9 P1s held. It is **not a clean holdout**, and the missing-proof gate could not be replayed.
+| Finding | Number |
+| --- | --- |
+| Open tickets that already have an engineering verdict | **34 of 48** (71%) |
+| Of those, still labelled "with Engineering" | **19** |
+| Marked Fixed and waiting on client confirmation | **12**, so open tickets could move from 48 to 36 |
+| Escalations returned without a fix | **275 of 486** (56.6%), of which 253 are clearly avoidable |
+| Engineering trips spent on tickets it did not fix | **528 of 777** (68.0%) |
+| Average open tickets, 19-31 Jul to Sep | **+63.9%** (arrivals +40.2%, time open +16.9%) |
 
-## Features
+The 48-to-36 drop is a one-time scenario that needs client confirmation. Volume drove about two-thirds of the rise, so this tool alone will not restore July levels.
 
-- **Burn-down:** the 48 snapshot tickets in next-action lanes, with status mismatches flagged.
-- **Pre-escalation check:** written proof for each required step, an advisory verdict, and a logged override. `monitor` logs without gating. `enforce` asks for proof or a reason. P1 tickets are never held.
-- **Known issues and draft playbooks:** issues derived from repeated duplicates, plus category steps that still need team review.
-- **Impact:** live activity, weekly measures, guardrails and the replay.
+## What it does
+
+- **Burn-down:** sorts the 48 snapshot tickets into next-action lanes and flags status mismatches.
+- **Pre-escalation check:** asks for written proof of each required step and gives an advisory verdict.
+- **P1 fast path:** P1 tickets are never held or gated.
+- **Monitor and Enforce:** Monitor logs advice and blocks nothing. Enforce asks for the missing proof or a logged reason.
+- **Known issues and draft playbooks:** shows repeated duplicates and category steps as warnings.
+- **Impact:** shows live activity, weekly trends, guardrails and the replay.
+
+## Replay evidence
+
+September replay of 189 escalations:
+
+| Policy | Held | True bugs delayed | Avoidable flagged | P1s held |
+| --- | ---: | ---: | ---: | ---: |
+| v1: history and config rules hold | 35 | 16 of 78 | 19 | 0 of 9 |
+| v2: history holds | 25 | 10 of 78 | 15 | 0 of 9 |
+| **v3: history warns, proof gates** | **0** | **0 of 78** | **15, as warnings** | **0 of 9** |
+
+The v3 zero is true by design and is not a live result. Past tickets have no recorded proof, so the missing-proof gate could not be replayed. v3 was designed after seeing September, so this is **not a clean holdout**.
 
 ## Architecture
 
-```text
-Browser -> Next.js web app -> FastAPI -> tickets CSV (read-only)
-           (server proxy)            -> SQLite or Postgres (decisions, backlog actions)
+```mermaid
+flowchart LR
+    A[L1 agent browser] --> B[Next.js on Vercel<br/>server proxy, Singapore]
+    B --> C[FastAPI on Render<br/>Singapore]
+    C --> D[(Tickets CSV<br/>read-only)]
+    C --> E[(Postgres<br/>decisions and actions)]
+    F[Uptime monitor] -. health check .-> C
 ```
 
 - `backend/`: check, burn-down, known issues, replay, metrics and name masking.
-- `web/`: Burn-down, Queue, ticket workspace and Impact. Its server proxy holds the API code and allows only listed routes.
-- Verdicts use only fields known at triage and outcomes closed before the ticket was created.
-- Backlog actions are recorded in the tool and never change the source data.
+- `web/`: Burn-down, Queue, ticket workspace and Impact.
+- The web proxy keeps the API code on the server and forwards only allowlisted routes.
+- Verdicts use only triage fields and outcomes closed before the ticket was created.
+- Actions are recorded in the tool and never change the source data.
 
 ## Run locally
 
@@ -70,14 +94,17 @@ Open <http://localhost:3000>.
 ## Tests
 
 ```bash
-cd backend && .venv/bin/pytest && .venv/bin/ruff check .
+cd backend && .venv/bin/pytest && .venv/bin/ruff check . && .venv/bin/ruff format --check .
 cd web && npm test && npm run lint && npm run typecheck
 ```
 
+The suite has 111 backend tests and 61 web tests, including checks that future outcomes cannot affect a past verdict.
+
 ## Deploy notes
 
-- API: `render.yaml` defines a Docker service. Add the CSV as a Render secret file and set `ACCESS_CODE`, `MASK_NAMES` and a Postgres `DATABASE_URL`.
-- Web: deploy `web/` to a Next.js host and set `API_BASE_URL` and `ACCESS_CODE` as server-side variables.
+- **API:** `render.yaml` defines a Docker service. Add the CSV as a Render secret file and set `ACCESS_CODE`, `MASK_NAMES`, `PRECHECK_MODE` and a Postgres `DATABASE_URL`.
+- **Web:** deploy `web/` to Vercel and set `API_BASE_URL` and `ACCESS_CODE` as server-side variables. `web/vercel.json` runs functions in Singapore, next to the API.
+- **Cold starts:** Render's free tier sleeps after 15 idle minutes. An uptime monitor on `/api/v1/health` keeps it awake, but it uses the free instance hours shared across the workspace.
 
 ## Known limits
 
