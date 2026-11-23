@@ -1,7 +1,7 @@
 import json
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, create_engine, inspect, text
+from sqlalchemy import DateTime, Integer, String, Text, create_engine, inspect, select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -42,6 +42,18 @@ class DecisionRepository:
     def __init__(self, engine: Engine) -> None:
         self._sessions = sessionmaker(engine, expire_on_commit=False)
         self._engine = engine
+
+    @property
+    def engine(self) -> Engine:
+        return self._engine
+
+    @property
+    def storage(self) -> str:
+        return "postgres" if self._engine.dialect.name == "postgresql" else "sqlite"
+
+    def all(self) -> list[DecisionRow]:
+        with self._sessions() as session:
+            return list(session.scalars(select(DecisionRow).order_by(DecisionRow.id)))
 
     def create_schema(self) -> None:
         Base.metadata.create_all(self._engine)

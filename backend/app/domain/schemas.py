@@ -125,5 +125,71 @@ class DecisionResponse(BaseModel):
     created_at: datetime
 
 
+class BacklogActionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["cleared", "waiting_client", "reopened"]
+    agent: ShortText
+    note: LongText | None = None
+
+
+class BurndownLane(BaseModel):
+    lane: str
+    label: str
+    count: int
+    owner: str
+    next_action: str
+
+
+class BurndownItem(BaseModel):
+    ticket_id: str
+    priority: str
+    client_name: str
+    category: str
+    description: str
+    assigned_agent: str
+    status: str
+    eng_outcome: str | None
+    age_hours: float
+    handoffs: int
+    reopen_count: int
+    lane: str
+    owner: str
+    next_action: str
+    status_mismatch: bool
+    state: str
+    last_action_at: datetime | None
+
+
+class BurndownResponse(BaseModel):
+    snapshot_at: datetime
+    open_at_snapshot: int
+    open_now: int
+    cleared: int
+    lanes: list[BurndownLane]
+    items: list[BurndownItem]
+
+
+class LiveDay(BaseModel):
+    day: str
+    decisions: int
+    cleared: int
+
+
+class LiveMetrics(BaseModel):
+    open_at_snapshot: int
+    open_now: int
+    cleared: int
+    decisions_total: int
+    by_action: dict[str, int]
+    overrides: int
+    override_rate: float
+    escalations_avoided: int
+    by_lane_cleared: dict[str, int]
+    by_day: list[LiveDay]
+    storage: Literal["postgres", "sqlite"]
+    durable: bool
+
+
 class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"

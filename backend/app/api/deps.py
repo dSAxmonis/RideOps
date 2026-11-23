@@ -5,6 +5,7 @@ from threading import Lock, Thread
 from fastapi import Request
 
 from app.config import Settings
+from app.repositories.backlog import BacklogRepository
 from app.repositories.decisions import DecisionRepository
 from app.repositories.tickets import TicketRepository
 from app.services.backtest import run_backtest
@@ -43,6 +44,7 @@ class AppState:
     def __init__(self, settings: Settings, decisions: DecisionRepository) -> None:
         self.settings = settings
         self.decisions = decisions
+        self.backlog = BacklogRepository(decisions.engine)
         self._data: DataContext | None = None
         self._weekly: dict[str, object] | None = None
         self._backtest: dict[str, object] | None = None
