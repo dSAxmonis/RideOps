@@ -29,7 +29,7 @@ def masked_rows():
             DUPLICATE,
             category=EXPORT,
             text=TEXT,
-            client_id="CL-007",
+            client_id="CL-9007",
             client_name=CLIENT_A,
             assigned_agent=AGENT_B,
         )
@@ -42,7 +42,7 @@ def masked_rows():
             category=EXPORT,
             text=TEXT,
             status="Open - with L1",
-            client_id="CL-042",
+            client_id="CL-9042",
             client_name=CLIENT_B,
             assigned_agent=AGENT_A,
         )
@@ -57,8 +57,8 @@ def test_aliases_are_deterministic(tmp_path):
     tickets = load_tickets(write_csv(tmp_path / "c.csv", rows))
     assert [first.apply(t) for t in tickets] == [second.apply(t) for t in tickets]
     by_id = {t.ticket_id: first.apply(t) for t in tickets}
-    assert by_id["T-M1"].client_name == "Client 042"
-    assert by_id["T-D0"].client_name == "Client 007"
+    assert by_id["T-M1"].client_name == "Client 9042"
+    assert by_id["T-D0"].client_name == "Client 9007"
     assert by_id["T-D0"].assigned_agent == "Agent A"
     assert by_id["T-M1"].assigned_agent == "Agent B"
 
@@ -100,5 +100,5 @@ def test_no_real_names_in_any_response_when_masked(tmp_path):
         filtered = client.get("/api/v1/tickets", params={"q": CLIENT_B}, headers=HEADERS).json()
     for name in REAL_NAMES:
         assert name.casefold() not in payload
-    assert "client 042" in payload
+    assert "client 9042" in payload
     assert filtered["total"] == 0
