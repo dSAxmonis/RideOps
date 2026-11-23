@@ -4,6 +4,8 @@ An internal tool for L1 support agents. It clears tickets that already have an e
 
 **Live demo:** <https://rideops-precheck.vercel.app> (no login needed)
 
+**Decks:** [Submission (PDF)](docs/RideOps_Submission_Deck.pdf) · [Architecture (PDF)](docs/RideOps_Architecture_Deck.pdf)
+
 ## The result
 
 | Finding | Number |
