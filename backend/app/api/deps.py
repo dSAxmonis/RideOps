@@ -1,5 +1,6 @@
+import logging
 from dataclasses import dataclass
-from threading import Lock
+from threading import Lock, Thread
 
 from fastapi import Request
 
@@ -10,6 +11,12 @@ from app.services.backtest import run_backtest
 from app.services.ingest import load_tickets
 from app.services.metrics import weekly_metrics
 from app.services.retrieval import KnowledgeBase
+
+logger = logging.getLogger(__name__)
+
+
+class ReportNotReady(Exception):
+    """A background report is still being computed."""
 
 
 @dataclass(slots=True)
@@ -29,6 +36,9 @@ class AppState:
         self._backtest: dict[str, object] | None = None
         self._lock = Lock()
         self._report_lock = Lock()
+        self._backtest_lock = Lock()
+        self._warm_lock = Lock()
+        self._warm_thread: Thread | None = None
 
     @property
     def data(self) -> DataContext:
@@ -46,11 +56,38 @@ class AppState:
             return self._weekly
 
     def backtest(self) -> dict[str, object]:
-        data = self.data
-        with self._report_lock:
-            if self._backtest is None:
-                self._backtest = run_backtest(data.tickets.all, data.knowledge)
+        if self._backtest is not None:
             return self._backtest
+        if self.settings.warm_reports:
+            self.warm_backtest()
+            raise ReportNotReady
+        with self._backtest_lock:
+            if self._backtest is None:
+                self._compute_backtest()
+            return self._backtest
+
+    def warm_backtest(self) -> None:
+        """Replay in the background so slow hosts can keep serving requests."""
+        with self._warm_lock:
+            if self._backtest is not None or self._warm_thread is not None:
+                return
+            self._warm_thread = Thread(target=self._warm, name="backtest-warmup", daemon=True)
+            self._warm_thread.start()
+
+    def _warm(self) -> None:
+        try:
+            with self._backtest_lock:
+                if self._backtest is None:
+                    self._compute_backtest()
+        except Exception:
+            logger.exception("Backtest warmup failed")
+        finally:
+            with self._warm_lock:
+                self._warm_thread = None
+
+    def _compute_backtest(self) -> None:
+        data = self.data
+        self._backtest = run_backtest(data.tickets.all, data.knowledge)
 
 
 def get_state(request: Request) -> AppState:
