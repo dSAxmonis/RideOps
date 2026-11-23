@@ -2,7 +2,7 @@
 
 An internal tool that helps an L1 support agent decide whether a ticket really needs engineering, before escalating it.
 
-**Live demo: TBD**
+**Live demo:** https://rideops-precheck.vercel.app (access code shared with the submission)
 
 ## Who it is for
 
