@@ -70,6 +70,6 @@ export function toPercentSeries(values: (number | null)[]) {
 }
 
 export const humanize = (value: string) => {
-  const text = value.replace(/_/g, " ");
+  const text = value.replace(/_/g, " ").replace(/\bl1\b/gi, "L1");
   return text.charAt(0).toUpperCase() + text.slice(1);
 };

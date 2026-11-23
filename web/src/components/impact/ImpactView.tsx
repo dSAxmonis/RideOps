@@ -19,36 +19,42 @@ const percent = (value: number) => `${value.toFixed(value >= 10 ? 0 : 1)}%`;
 const hours = (value: number) => `${value.toFixed(value >= 10 ? 0 : 1)}h`;
 const count = (value: number) => value.toFixed(0);
 const score = (value: number) => value.toFixed(2);
+const axisPercent = (value: number) => `${Math.round(value)}%`;
+const axisHours = (value: number) => `${Math.round(value)}h`;
+const axisCount = (value: number) => String(Math.round(value));
 
 interface Series {
   key: keyof WeekMetrics;
   title: string;
   hint: string;
   format: (value: number) => string;
+  axisFormat: (value: number) => string;
   rate?: boolean;
   domain?: [number, number];
 }
 
 const OUTCOMES: Series[] = [
-  { key: "avg_open_7d", title: "Open tickets", hint: "7-day average", format: count },
+  { key: "avg_open_7d", title: "Open tickets", hint: "7-day average", format: count, axisFormat: axisCount },
   {
     key: "avoidable_escalation_share",
     title: "Avoidable escalation share",
     hint: "Of escalations to engineering",
     format: percent,
+    axisFormat: axisPercent,
     rate: true,
   },
 ];
 
 const GUARDRAILS: Series[] = [
-  { key: "reopen_rate", title: "Reopen rate", hint: "Lower is better", format: percent, rate: true },
-  { key: "p1p2_median_close_h", title: "P1/P2 median close", hint: "Hours, lower is better", format: hours },
-  { key: "csat_avg", title: "CSAT", hint: "Average, responders only", format: score, domain: [1, 5] },
+  { key: "reopen_rate", title: "Reopen rate", hint: "Lower is better", format: percent, axisFormat: axisPercent, rate: true },
+  { key: "p1p2_median_close_h", title: "P1/P2 median close", hint: "Hours, lower is better", format: hours, axisFormat: axisHours },
+  { key: "csat_avg", title: "CSAT", hint: "Average, responders only", format: score, axisFormat: axisCount, domain: [1, 5] },
   {
     key: "csat_response_rate",
     title: "CSAT response rate",
     hint: "How far CSAT can be trusted",
     format: percent,
+    axisFormat: axisPercent,
     rate: true,
   },
 ];
@@ -81,7 +87,7 @@ function TrendPanel({ weeks, series, height }: { weeks: WeekMetrics[]; series: S
         </span>
       </figcaption>
       {points.some((point) => point.value !== null) ? (
-        <TrendChart points={points} format={series.format} domain={series.domain} height={height} label={series.title} />
+        <TrendChart points={points} format={series.format} axisFormat={series.axisFormat} domain={series.domain} height={height} label={series.title} />
       ) : (
         <p className="py-8 text-center text-ink-2">No data reported.</p>
       )}

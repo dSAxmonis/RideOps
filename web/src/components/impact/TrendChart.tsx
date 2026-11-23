@@ -4,7 +4,6 @@ import {
   CartesianGrid,
   Line,
   LineChart,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -63,18 +62,19 @@ function TrendTooltip({
 export default function TrendChart({
   points,
   format,
+  axisFormat = format,
   domain,
   height = 150,
   label,
 }: {
   points: TrendPoint[];
   format: (value: number) => string;
+  axisFormat?: (value: number) => string;
   domain?: [number, number];
   height?: number;
   label: string;
 }) {
   const rows = toChartRows(points);
-  const hasPartial = points.some((point) => point.partial);
   return (
     <div role="img" aria-label={`${label}, weekly line chart. Exact values are in the data table.`} style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -91,7 +91,7 @@ export default function TrendChart({
           <YAxis
             width={44}
             domain={domain ?? [0, "auto"]}
-            tickFormatter={(value: number) => format(value)}
+            tickFormatter={(value: number) => axisFormat(value)}
             tick={{ fill: "var(--ink-2)", fontSize: 11 }}
             axisLine={false}
             tickLine={false}
@@ -107,7 +107,6 @@ export default function TrendChart({
               />
             )}
           />
-          {hasPartial ? null : <ReferenceLine y={domain?.[0] ?? 0} stroke="var(--line)" />}
           <Line
             type="linear"
             dataKey="full"
