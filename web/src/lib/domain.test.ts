@@ -44,8 +44,15 @@ describe("proof", () => {
   it("needs 8 non-space characters and at most 300", () => {
     expect(isValidProof("a b c d e f g")).toBe(false);
     expect(isValidProof("a b c d e f g h")).toBe(true);
-    expect(isValidProof("x".repeat(300))).toBe(true);
-    expect(isValidProof("x".repeat(301))).toBe(false);
+    expect(isValidProof("abcd".repeat(75))).toBe(true);
+    expect(isValidProof(`${"abcd".repeat(75)}x`)).toBe(false);
+  });
+
+  it("rejects repeated filler", () => {
+    expect(isValidProof("aaaaaaaa")).toBe(false);
+    expect(isValidProof("abababab")).toBe(false);
+    expect(isValidProof("........")).toBe(false);
+    expect(isValidProof("12345678")).toBe(true);
   });
 
   it("sends only valid proof, trimmed", () => {
