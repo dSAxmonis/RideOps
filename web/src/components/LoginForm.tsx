@@ -10,7 +10,7 @@ type Phase = "idle" | "submitting" | "waking" | "wake_failed";
 
 const MESSAGES: Record<string, string> = {
   invalid_code: "That access code was not accepted.",
-  not_configured: "The app is not configured: API_BASE_URL is missing.",
+  not_configured: "The app is not configured: server settings are missing.",
 };
 
 export function LoginForm() {

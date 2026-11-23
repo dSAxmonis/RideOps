@@ -47,7 +47,7 @@ function errorMessage(error: unknown) {
     }
     if (error.status === 404) return "Not found.";
     if (error.code === "network") return "Cannot reach the app. Check your connection.";
-    if (error.code === "not_configured") return "The app is not configured: API_BASE_URL is missing.";
+    if (error.code === "not_configured") return "The app is not configured: server settings are missing.";
   }
   return "Something went wrong loading this.";
 }

@@ -2,7 +2,7 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const cookieValue = vi.hoisted(() => ({ current: "test-code" as string | undefined }));
+const cookieValue = vi.hoisted(() => ({ current: undefined as string | undefined }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({
@@ -11,6 +11,7 @@ vi.mock("next/headers", () => ({
   }),
 }));
 
+import { sealSession } from "@/lib/server/sealed";
 import { GET, POST } from "./route";
 
 const context = (...path: string[]) => ({ params: Promise.resolve({ path }) });
@@ -19,8 +20,9 @@ const json = (body: unknown, status = 200) =>
 
 describe("proxy route", () => {
   beforeEach(() => {
-    cookieValue.current = "test-code";
     vi.stubEnv("API_BASE_URL", "https://backend.test/");
+    vi.stubEnv("SESSION_SECRET", "unit-test-secret-unit-test-secret-000");
+    cookieValue.current = sealSession("test-code")!;
   });
 
   it("forwards the code server-side to the versioned API", async () => {
@@ -50,6 +52,24 @@ describe("proxy route", () => {
     vi.stubGlobal("fetch", vi.fn());
     const response = await GET(new NextRequest("http://app.test/api/proxy/health"), context("health"));
     expect(response.status).toBe(401);
+  });
+
+  it("rejects a tampered session without calling upstream", async () => {
+    cookieValue.current = `${cookieValue.current}x`;
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await GET(new NextRequest("http://app.test/api/proxy/health"), context("health"));
+    expect(response.status).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the session secret is unset", async () => {
+    vi.stubEnv("SESSION_SECRET", "");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await GET(new NextRequest("http://app.test/api/proxy/health"), context("health"));
+    expect(response.status).toBe(500);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("blocks cross-origin POST", async () => {

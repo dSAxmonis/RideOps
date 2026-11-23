@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveProxyTarget } from "@/lib/server/allowlist";
+import { isSessionConfigured, openSession } from "@/lib/server/sealed";
 import {
   SESSION_COOKIE,
   UPSTREAM_TIMEOUT_MS,
@@ -29,8 +30,14 @@ async function forward(request: NextRequest, context: RouteContext) {
     return errorResponse(403, "forbidden");
   }
 
-  const accessCode = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!accessCode) return errorResponse(401, "unauthorized");
+  if (!isSessionConfigured()) return errorResponse(500, "not_configured");
+
+  const accessCode = openSession((await cookies()).get(SESSION_COOKIE)?.value);
+  if (!accessCode) {
+    const response = errorResponse(401, "unauthorized");
+    response.cookies.delete(SESSION_COOKIE);
+    return response;
+  }
 
   const baseUrl = apiBaseUrl();
   if (!baseUrl) return errorResponse(500, "not_configured");

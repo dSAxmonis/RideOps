@@ -1,7 +1,8 @@
 import "server-only";
 
+import { SESSION_TTL_SECONDS } from "@/lib/server/sealed";
+
 export const SESSION_COOKIE = "rideops_session";
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
 export const UPSTREAM_TIMEOUT_MS = 25_000;
 
 export const sessionCookieOptions = () => ({
@@ -9,7 +10,7 @@ export const sessionCookieOptions = () => ({
   secure: process.env.NODE_ENV === "production",
   sameSite: "strict" as const,
   path: "/",
-  maxAge: SESSION_MAX_AGE_SECONDS,
+  maxAge: SESSION_TTL_SECONDS,
 });
 
 export function apiBaseUrl(): string | null {

@@ -8,6 +8,7 @@ import {
   isSameOrigin,
   sessionCookieOptions,
 } from "@/lib/server/session";
+import { isSessionConfigured, sealSession } from "@/lib/server/sealed";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return reply(400, "invalid_request");
 
   const baseUrl = apiBaseUrl();
-  if (!baseUrl) return reply(500, "not_configured");
+  if (!baseUrl || !isSessionConfigured()) return reply(500, "not_configured");
 
   let upstream: Response;
   try {
@@ -42,7 +43,10 @@ export async function POST(request: Request) {
   if (isColdStartStatus(upstream.status)) return reply(503, "upstream_unavailable");
   if (!upstream.ok) return reply(502, "bad_upstream_response");
 
+  const sealed = sealSession(parsed.data.code);
+  if (!sealed) return reply(500, "not_configured");
+
   const response = NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
-  response.cookies.set(SESSION_COOKIE, parsed.data.code, sessionCookieOptions());
+  response.cookies.set(SESSION_COOKIE, sealed, sessionCookieOptions());
   return response;
 }
