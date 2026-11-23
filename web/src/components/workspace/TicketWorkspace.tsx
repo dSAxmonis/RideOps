@@ -2,14 +2,16 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fetchTicket, runPrecheck, submitDecision } from "@/lib/api";
-import type { ChecklistItem, DecisionAction, DecisionRequest, Ticket } from "@/lib/contract";
-import { formatDateTime, humanize, isP1, isTicketClosed } from "@/lib/domain";
+import type { DecisionAction, DecisionRequest, Evidence, Ticket } from "@/lib/contract";
+import { formatDateTime, humanize, isP1, isTicketClosed, isValidProof, validEvidence } from "@/lib/domain";
 import { PriorityBadge } from "@/components/PriorityBadge";
 import { ErrorNotice, LoadingRows, QueryBoundary } from "@/components/QueryStates";
 import { DecisionBar } from "@/components/workspace/DecisionBar";
 import { P1FastPath, PrecheckPanel } from "@/components/workspace/PrecheckPanel";
+
+const PROOF_DEBOUNCE_MS = 500;
 
 function TicketDetails({ ticket }: { ticket: Ticket }) {
   const fields: [string, string][] = [
@@ -59,7 +61,8 @@ function CheckColumn({ ticket }: { ticket: Ticket }) {
   const queryClient = useQueryClient();
   const id = ticket.ticket_id;
   const fastPath = isP1(ticket.priority);
-  const [evidence, setEvidence] = useState<Record<string, boolean>>({});
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [sentEvidence, setSentEvidence] = useState<Evidence>({});
   const [note, setNote] = useState("");
   const [sentNote, setSentNote] = useState("");
   const [recorded, setRecorded] = useState<DecisionAction | null>(null);
@@ -69,10 +72,18 @@ function CheckColumn({ ticket }: { ticket: Ticket }) {
     return () => clearTimeout(timer);
   }, [note]);
 
+  const evidence = useMemo(() => validEvidence(drafts), [drafts]);
+  const evidenceKey = JSON.stringify(evidence);
+  useEffect(() => {
+    const timer = setTimeout(() => setSentEvidence(JSON.parse(evidenceKey) as Evidence), PROOF_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [evidenceKey]);
+  const evidencePending = evidenceKey !== JSON.stringify(sentEvidence);
+
   const precheck = useQuery({
-    queryKey: ["precheck", id, evidence, sentNote],
+    queryKey: ["precheck", id, sentEvidence, sentNote],
     queryFn: ({ signal }) =>
-      runPrecheck(id, { evidence, ...(sentNote ? { note: sentNote } : {}) }, signal),
+      runPrecheck(id, { evidence: sentEvidence, ...(sentNote ? { note: sentNote } : {}) }, signal),
     placeholderData: keepPreviousData,
     staleTime: Infinity,
     gcTime: 60_000,
@@ -85,16 +96,11 @@ function CheckColumn({ ticket }: { ticket: Ticket }) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["tickets"] }),
         queryClient.invalidateQueries({ queryKey: ["ticket", id] }),
+        queryClient.invalidateQueries({ queryKey: ["burndown"] }),
+        queryClient.invalidateQueries({ queryKey: ["metrics", "live"] }),
       ]);
     },
   });
-
-  const toggle = (checklist: ChecklistItem[], key: string, done: boolean) => {
-    setEvidence({
-      ...Object.fromEntries(checklist.map((item) => [item.key, item.done])),
-      [key]: done,
-    });
-  };
 
   const verdict = precheck.isError ? null : (precheck.data?.verdict ?? null);
   const noActionNeeded = recorded === null && (isTicketClosed(ticket.status) || ticket.escalated_to_eng);
@@ -107,7 +113,7 @@ function CheckColumn({ ticket }: { ticket: Ticket }) {
       priority={ticket.priority}
       verdict={verdict}
       evidence={evidence}
-      checking={precheck.isFetching}
+      checking={precheck.isFetching || evidencePending}
       submitting={decision.isPending}
       error={decision.error}
       recorded={recorded}
@@ -130,16 +136,18 @@ function CheckColumn({ ticket }: { ticket: Ticket }) {
       ) : (
         <QueryBoundary query={precheck} loading={<LoadingRows rows={4} />}>
           {(data) => {
-            const checklist = data.checklist.map((item) => ({
-              ...item,
-              done: evidence[item.key] ?? item.done,
-            }));
+            const checklist = data.checklist.map((item) => {
+              const draft = drafts[item.key];
+              return draft === undefined
+                ? item
+                : { ...item, proof: draft, done: isValidProof(draft) };
+            });
             return (
               <PrecheckPanel
                 data={{ ...data, checklist }}
                 isP1Ticket={fastPath}
-                updating={precheck.isFetching}
-                onToggle={(key, done) => toggle(checklist, key, done)}
+                updating={precheck.isFetching || evidencePending}
+                onProofChange={(key, proof) => setDrafts((current) => ({ ...current, [key]: proof }))}
               />
             );
           }}
@@ -172,9 +180,10 @@ export function TicketWorkspace({ id }: { id: string }) {
   });
   return (
     <div className="space-y-2">
-      <Link href="/" className="text-[13px] text-ink-2 hover:text-ink">
-        ← Back to queue
-      </Link>
+      <nav aria-label="Back" className="flex gap-3 text-[13px] text-ink-2">
+        <Link href="/burndown" className="hover:text-ink">← Burn-down</Link>
+        <Link href="/queue" className="hover:text-ink">← Queue</Link>
+      </nav>
       <QueryBoundary query={ticket} loading={<LoadingRows rows={8} />}>
         {(data) => (
           <div className="grid gap-3 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-start">

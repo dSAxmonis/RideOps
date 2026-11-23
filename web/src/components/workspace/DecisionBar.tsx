@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { ApiError, isOverrideRequiredError, isWakingError } from "@/lib/api";
-import type { DecisionAction, DecisionRequest, Verdict } from "@/lib/contract";
+import type { DecisionAction, DecisionRequest, Evidence, Verdict } from "@/lib/contract";
 import { isP1, requiresOverrideReason } from "@/lib/domain";
 import { useAgentName } from "@/lib/useAgentName";
 import { buttonClass } from "@/components/QueryStates";
@@ -44,7 +44,7 @@ export function DecisionBar({
 }: {
   priority: string;
   verdict: Verdict | null;
-  evidence: Record<string, boolean>;
+  evidence: Evidence;
   /** The verdict is being recomputed, so a reason requirement may be about to change. */
   checking?: boolean;
   submitting: boolean;

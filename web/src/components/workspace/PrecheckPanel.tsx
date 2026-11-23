@@ -1,7 +1,14 @@
 "use client";
 
-import type { ChecklistItem, PrecheckResponse, SimilarTicket, Verdict } from "@/lib/contract";
-import { formatDateTime, humanize } from "@/lib/domain";
+import type {
+  ChecklistItem,
+  KnownIssueMatch,
+  Playbook,
+  PrecheckResponse,
+  SimilarTicket,
+  Verdict,
+} from "@/lib/contract";
+import { MAX_PROOF_CHARS, MIN_PROOF_CHARS, formatDateTime, humanize, proofChars } from "@/lib/domain";
 import { Icon, type IconName } from "@/components/Icon";
 
 const VERDICT_COPY: Record<Verdict, { label: string; lead: string; icon: IconName; tone: string }> = {
@@ -78,35 +85,93 @@ function VerdictSummary({ data, updating }: { data: PrecheckResponse; updating: 
   );
 }
 
+function proofStatus(item: ChecklistItem) {
+  if (item.done) return "Done";
+  const count = proofChars(item.proof);
+  if (count === 0) return item.required ? "Required" : "Optional";
+  return `${MIN_PROOF_CHARS - count > 0 ? MIN_PROOF_CHARS - count : 0} more characters`;
+}
+
 function Checklist({
   items,
   fastPath,
-  onToggle,
+  onProofChange,
 }: {
   items: ChecklistItem[];
   fastPath: boolean;
-  onToggle: (key: string, done: boolean) => void;
+  onProofChange: (key: string, proof: string) => void;
 }) {
   return (
     <section aria-label="Evidence checklist" className="bg-surface px-3 py-2">
       <h3 className={sectionTitle}>Evidence{fastPath ? " (optional)" : ""}</h3>
+      <p className="mb-1 text-xs text-ink-2">
+        Add a short proof for each item. It counts from {MIN_PROOF_CHARS} characters.
+      </p>
       {items.length === 0 ? <p className="text-ink-2">No evidence needed for this ticket.</p> : null}
-      <ul>
-        {items.map((item) => (
-          <li key={item.key}>
-            <label className="flex min-h-9 cursor-pointer items-center gap-2 py-0.5">
+      <ul className="space-y-2">
+        {items.map((item) => {
+          const inputId = `proof-${item.key}`;
+          const hintId = `${inputId}-hint`;
+          return (
+            <li key={item.key}>
+              <div className="flex items-center gap-1.5">
+                <span className={item.done ? "text-good" : "text-ink-3"}>
+                  {item.done ? <Icon name="check" /> : <span aria-hidden="true" className="block h-4 w-4 rounded-full border border-current" />}
+                </span>
+                <label htmlFor={inputId} className="min-w-0 flex-1 font-medium">
+                  {item.label}
+                </label>
+                <span className="shrink-0 text-xs text-ink-2">
+                  {fastPath && !item.done && proofChars(item.proof) === 0 ? "Optional" : proofStatus(item)}
+                </span>
+              </div>
               <input
-                type="checkbox"
-                checked={item.done}
-                onChange={(event) => onToggle(item.key, event.target.checked)}
-                className="h-4 w-4 shrink-0 accent-[var(--accent)]"
+                id={inputId}
+                value={item.proof}
+                maxLength={MAX_PROOF_CHARS}
+                onChange={(event) => onProofChange(item.key, event.target.value)}
+                placeholder={item.proof_hint || "Short proof"}
+                aria-describedby={item.proof_hint ? hintId : undefined}
+                autoComplete="off"
+                className="mt-0.5 h-8 w-full rounded border border-line bg-surface px-2"
               />
-              <span className="min-w-0 flex-1">{item.label}</span>
-              {item.required && !fastPath ? <span className="text-xs text-ink-2">Required</span> : null}
-            </label>
-          </li>
-        ))}
+              {item.proof_hint ? (
+                <p id={hintId} className="mt-0.5 text-xs text-ink-2">{item.proof_hint}</p>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
+    </section>
+  );
+}
+
+function KnownIssue({ issue, fastPath }: { issue: KnownIssueMatch; fastPath: boolean }) {
+  return (
+    <section aria-label="Known issue" className="border-l-2 border-warning bg-surface px-3 py-2">
+      <p className="text-xs font-semibold text-ink-2">Known issue</p>
+      <p className="text-[15px] font-semibold">{issue.title}</p>
+      <p className="text-xs text-ink-2">
+        {issue.duplicate_count} past duplicates. Last seen {formatDateTime(issue.last_seen)}.
+        {fastPath ? " Context only: do not delay this P1." : ""}
+      </p>
+    </section>
+  );
+}
+
+function PlaybookSteps({ playbook, fastPath }: { playbook: Playbook; fastPath: boolean }) {
+  return (
+    <section aria-label="Playbook" className="bg-surface px-3 py-2">
+      <h3 className={sectionTitle}>
+        {playbook.draft ? "Draft playbook" : "Playbook"}: {playbook.title}
+      </h3>
+      {fastPath ? <p className="mb-1 text-xs text-ink-2">For reference after escalating.</p> : null}
+      <ol className="list-decimal space-y-0.5 pl-5">
+        {playbook.steps.map((step, index) => (
+          <li key={`${index}-${step}`}>{step}</li>
+        ))}
+      </ol>
+      {playbook.draft ? <p className="mt-1 text-xs text-ink-2">Draft: check each step before using it.</p> : null}
     </section>
   );
 }
@@ -141,17 +206,21 @@ export function PrecheckPanel({
   data,
   isP1Ticket,
   updating,
-  onToggle,
+  onProofChange,
 }: {
   data: PrecheckResponse;
   isP1Ticket: boolean;
   updating: boolean;
-  onToggle: (key: string, done: boolean) => void;
+  onProofChange: (key: string, proof: string) => void;
 }) {
   return (
     <div className="space-y-px bg-line">
       {isP1Ticket ? null : <VerdictSummary data={data} updating={updating} />}
-      <Checklist items={data.checklist} fastPath={isP1Ticket} onToggle={onToggle} />
+      {data.known_issue ? <KnownIssue issue={data.known_issue} fastPath={isP1Ticket} /> : null}
+      {data.playbook && data.playbook.steps.length > 0 ? (
+        <PlaybookSteps playbook={data.playbook} fastPath={isP1Ticket} />
+      ) : null}
+      <Checklist items={data.checklist} fastPath={isP1Ticket} onProofChange={onProofChange} />
       <SimilarTickets items={data.similar} />
     </div>
   );

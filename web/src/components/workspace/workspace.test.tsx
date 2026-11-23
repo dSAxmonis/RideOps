@@ -11,23 +11,39 @@ const precheck: PrecheckResponse = {
   verdict: "likely_known_issue",
   confidence_band: "medium",
   reasons: ["Matches a sample pattern"],
-  checklist: [{ key: "logs", label: "Logs attached", required: true, done: false }],
+  checklist: [{ key: "logs", label: "Logs attached", required: true, done: false, proof: "", proof_hint: "Paste a log reference" }],
   similar: [],
   suggested_action: "Hold and apply the known fix",
   override_allowed: true,
+  known_issue: { id: "7", title: "Sample known issue", duplicate_count: 4, last_seen: null },
+  playbook: { title: "Sample steps", steps: ["Check the sample setting"], draft: true },
 };
 
 describe("PrecheckPanel", () => {
   it("shows the verdict and reports evidence changes", async () => {
-    const onToggle = vi.fn();
-    render(<PrecheckPanel data={precheck} isP1Ticket={false} updating={false} onToggle={onToggle} />);
+    const onProofChange = vi.fn();
+    render(<PrecheckPanel data={precheck} isP1Ticket={false} updating={false} onProofChange={onProofChange} />);
     expect(screen.getByText("Likely a known issue")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("checkbox", { name: /Logs attached/ }));
-    expect(onToggle).toHaveBeenCalledWith("logs", true);
+    expect(screen.getByText("Paste a log reference")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Logs attached"), "x");
+    expect(onProofChange).toHaveBeenCalledWith("logs", "x");
+  });
+
+  it("shows the known issue and draft playbook", () => {
+    render(<PrecheckPanel data={precheck} isP1Ticket={false} updating={false} onProofChange={vi.fn()} />);
+    expect(screen.getByText("Sample known issue")).toBeInTheDocument();
+    expect(screen.getByText(/Draft playbook/)).toBeInTheDocument();
+    expect(screen.getByText("Check the sample setting")).toBeInTheDocument();
+  });
+
+  it("shows how much proof is still needed", () => {
+    const partial = { ...precheck, checklist: [{ ...precheck.checklist[0]!, proof: "abc" }] };
+    render(<PrecheckPanel data={partial} isP1Ticket={false} updating={false} onProofChange={vi.fn()} />);
+    expect(screen.getByText("5 more characters")).toBeInTheDocument();
   });
 
   it("never shows hold advice on a P1", () => {
-    render(<PrecheckPanel data={precheck} isP1Ticket updating={false} onToggle={vi.fn()} />);
+    render(<PrecheckPanel data={precheck} isP1Ticket updating={false} onProofChange={vi.fn()} />);
     expect(screen.queryByText("Likely a known issue")).not.toBeInTheDocument();
     expect(screen.queryByText(/Hold and apply/)).not.toBeInTheDocument();
   });
@@ -38,7 +54,7 @@ describe("DecisionBar", () => {
     localStorage.setItem("rideops_agent_name", "Test Agent");
     const onSubmit = vi.fn();
     render(
-      <DecisionBar priority={priority} verdict={verdict} submitting={false} error={null} recorded={null} evidence={{ logs: true }} onSubmit={onSubmit} />,
+      <DecisionBar priority={priority} verdict={verdict} submitting={false} error={null} recorded={null} evidence={{ logs: "sample proof" }} onSubmit={onSubmit} />,
     );
     return onSubmit;
   };
@@ -54,7 +70,7 @@ describe("DecisionBar", () => {
     expect(onSubmit).toHaveBeenCalledWith({
       action: "escalated",
       verdict_shown: "needs_info",
-      evidence: { logs: true },
+      evidence: { logs: "sample proof" },
       agent: "Test Agent",
       override_reason: "Client is blocked",
     }, expect.anything());
@@ -66,7 +82,7 @@ describe("DecisionBar", () => {
     expect(onSubmit).toHaveBeenCalledWith({
       action: "escalated",
       verdict_shown: "likely_known_issue",
-      evidence: { logs: true },
+      evidence: { logs: "sample proof" },
       agent: "Test Agent",
     }, expect.anything());
   });
