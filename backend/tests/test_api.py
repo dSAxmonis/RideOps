@@ -1,0 +1,163 @@
+import pytest
+
+from app.domain.checklists import CHECKLISTS
+from tests.conftest import EXPORT, HEADERS, ROSTER, all_evidence, make_client
+
+PROTECTED = [
+    ("get", "/api/v1/tickets"),
+    ("get", "/api/v1/tickets/T-Q1"),
+    ("post", "/api/v1/tickets/T-Q1/precheck"),
+    ("post", "/api/v1/tickets/T-Q1/decisions"),
+    ("get", "/api/v1/metrics/weekly"),
+    ("get", "/api/v1/metrics/backtest"),
+]
+
+
+def precheck(client, ticket_id, evidence):
+    response = client.post(
+        f"/api/v1/tickets/{ticket_id}/precheck", headers=HEADERS, json={"evidence": evidence}
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def decide(client, ticket_id, **body):
+    payload = {"agent": "Agent Test", **body}
+    return client.post(f"/api/v1/tickets/{ticket_id}/decisions", headers=HEADERS, json=payload)
+
+
+def test_health_needs_no_auth_or_data():
+    with make_client(None, access_code=None) as client:
+        assert client.get("/api/v1/health").json() == {"status": "ok"}
+
+
+@pytest.mark.parametrize(("method", "path"), PROTECTED)
+def test_missing_or_wrong_code_rejected(client, method, path):
+    assert client.request(method, path).status_code == 401
+    wrong = client.request(method, path, headers={"X-Access-Code": "nope"})
+    assert wrong.status_code == 401
+
+
+@pytest.mark.parametrize("configured", [None, ""])
+@pytest.mark.parametrize(("method", "path"), PROTECTED)
+def test_fails_closed_when_code_unset(data_path, configured, method, path):
+    with make_client(data_path, access_code=configured) as client:
+        response = client.request(method, path, headers={"X-Access-Code": ""})
+        assert response.status_code == 503
+
+
+def test_non_ascii_code_is_rejected_cleanly(client):
+    response = client.get("/api/v1/tickets", headers={"X-Access-Code": "caf\xe9".encode("latin-1")})
+    assert response.status_code == 401
+
+
+def test_ticket_filters_and_pagination(client):
+    body = client.get("/api/v1/tickets?status=open", headers=HEADERS).json()
+    assert body["total"] == 2
+    assert {item["ticket_id"] for item in body["items"]} == {"T-OPEN", "T-L1"}
+    assert "eng_outcome" not in body["items"][0]
+    page = client.get("/api/v1/tickets?limit=3&offset=1", headers=HEADERS).json()
+    assert len(page["items"]) == 3
+    assert page["total"] == 20
+    found = client.get("/api/v1/tickets?q=BETA%20PANEL", headers=HEADERS).json()
+    assert [item["ticket_id"] for item in found["items"]] == ["T-L1"]
+    assert client.get("/api/v1/tickets?status=bad", headers=HEADERS).status_code == 422
+
+
+def test_unknown_ticket_is_404(client):
+    assert client.get("/api/v1/tickets/NOPE", headers=HEADERS).status_code == 404
+
+
+def test_every_category_has_required_evidence():
+    assert len(CHECKLISTS) == 10
+    for items in CHECKLISTS.values():
+        assert any(item.required for item in items)
+        assert len({item.key for item in items}) == len(items)
+
+
+def test_known_issue_verdict_explains_itself(client):
+    body = precheck(client, "T-Q1", {})
+    assert body["verdict"] == "likely_known_issue"
+    assert body["override_allowed"] is True
+    assert body["similar"][0]["eng_outcome"] == "Duplicate of known issue"
+    assert body["similar"][0]["similarity"] > 0.9
+    joined = " ".join(body["reasons"])
+    assert "KNOWN_ISSUE_HISTORY" in joined
+    assert "category outcome history" in joined.lower()
+
+
+def test_missing_evidence_then_ready(client):
+    assert precheck(client, "T-R1", {})["verdict"] == "needs_info"
+    done = precheck(client, "T-R1", all_evidence(ROSTER))
+    assert done["verdict"] == "ready_to_escalate"
+    assert all(item["done"] for item in done["checklist"])
+
+
+def test_unknown_evidence_key_rejected(client):
+    response = client.post(
+        "/api/v1/tickets/T-R1/precheck", headers=HEADERS, json={"evidence": {"bogus": True}}
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("evidence", [{}, all_evidence(EXPORT)])
+def test_p1_is_never_held(client, evidence):
+    body = precheck(client, "T-P1", evidence)
+    assert body["verdict"] == "ready_to_escalate"
+    assert "P1_FAST_PATH" in body["reasons"][0]
+    assert body["suggested_action"].startswith("Escalate now")
+    if not evidence:
+        assert any(reason.startswith("Warning") for reason in body["reasons"])
+
+
+def test_override_reason_required_against_non_ready_verdict(client):
+    rejected = decide(client, "T-Q1", action="escalated", verdict_shown="likely_known_issue")
+    assert rejected.status_code == 422
+    blank = decide(
+        client,
+        "T-Q1",
+        action="escalated",
+        verdict_shown="needs_info",
+        override_reason="   ",
+    )
+    assert blank.status_code == 422
+    accepted = decide(
+        client,
+        "T-Q1",
+        action="escalated",
+        verdict_shown="likely_known_issue",
+        override_reason="Different error from the known issue",
+    )
+    assert accepted.status_code == 201
+    assert accepted.json()["override_reason"] == "Different error from the known issue"
+
+
+def test_override_not_required_for_p1_or_ready_or_non_escalation(client):
+    assert decide(client, "T-P1", action="escalated", verdict_shown="needs_info").status_code == 201
+    assert (
+        decide(client, "T-Q1", action="escalated", verdict_shown="ready_to_escalate").status_code
+        == 201
+    )
+    assert (
+        decide(client, "T-Q1", action="resolved_at_l1", verdict_shown="try_l1_fix").status_code
+        == 201
+    )
+
+
+def test_weekly_metrics_shape_and_totals(client):
+    body = client.get("/api/v1/metrics/weekly", headers=HEADERS).json()
+    assert body["totals"]["tickets"] == 20
+    assert body["totals"]["open"] == 2
+    assert sum(week["arrivals"] for week in body["weeks"]) == 20
+    assert body["weeks"][0]["partial"] is True
+    assert body["weeks"][-1]["partial"] is True
+    assert not any(week["in_baseline"] and week["partial"] for week in body["weeks"])
+    assert all(week["week_start"] >= "2026-07-19" for week in body["weeks"] if week["in_baseline"])
+
+
+def test_backtest_reports_guardrails(client):
+    body = client.get("/api/v1/metrics/backtest", headers=HEADERS).json()
+    assert body["escalations"] == 2
+    assert body["p1"]["misses"] == 0
+    assert "count" in body["fixed_bugs_delayed"]
+    assert sum(body["flagged_by_verdict"].values()) == 2
