@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     data_path: str | None = Field(default=None, validation_alias="RIDEOPS_DATA_PATH")
     database_url: str = Field(default="sqlite:///./rideops.db", validation_alias="DATABASE_URL")
     warm_reports: bool = Field(default=False, validation_alias="WARM_REPORTS")
+    mask_names: bool = Field(default=False, validation_alias="MASK_NAMES")
 
     @field_validator("database_url")
     @classmethod

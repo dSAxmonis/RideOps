@@ -9,6 +9,7 @@ from app.repositories.decisions import DecisionRepository
 from app.repositories.tickets import TicketRepository
 from app.services.backtest import run_backtest
 from app.services.ingest import load_tickets
+from app.services.masking import NameMasker
 from app.services.metrics import weekly_metrics
 from app.services.retrieval import KnowledgeBase
 
@@ -23,6 +24,17 @@ class ReportNotReady(Exception):
 class DataContext:
     tickets: TicketRepository
     knowledge: KnowledgeBase
+    masker: NameMasker | None = None
+
+    def scrub(self, text: str | None) -> str | None:
+        if text is None or self.masker is None:
+            return text
+        return self.masker.scrub(text)
+
+    def scrub_evidence(self, evidence: dict[str, str] | None) -> dict[str, str] | None:
+        if evidence is None:
+            return None
+        return {key: self.scrub(proof) for key, proof in evidence.items()}
 
 
 class AppState:
@@ -45,7 +57,10 @@ class AppState:
         with self._lock:
             if self._data is None:
                 records = load_tickets(self.settings.data_path)
-                self._data = DataContext(TicketRepository(records), KnowledgeBase(records))
+                masker = NameMasker.from_tickets(records) if self.settings.mask_names else None
+                if masker:
+                    records = [masker.apply(record) for record in records]
+                self._data = DataContext(TicketRepository(records), KnowledgeBase(records), masker)
             return self._data
 
     def weekly(self) -> dict[str, object]:

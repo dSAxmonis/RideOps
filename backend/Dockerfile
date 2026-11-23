@@ -12,4 +12,5 @@ USER appuser
 
 EXPOSE 8000
 ENV WARM_REPORTS=true
+ENV MASK_NAMES=true
 CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]

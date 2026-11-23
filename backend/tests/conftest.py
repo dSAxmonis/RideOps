@@ -141,9 +141,10 @@ def data_path(tmp_path) -> Path:
     return write_csv(tmp_path / "tickets.csv", fixture_rows())
 
 
-def make_client(data_path, access_code=ACCESS_CODE):
+def make_client(data_path, access_code=ACCESS_CODE, mask_names=False):
     settings = Settings(
         ACCESS_CODE=access_code,
+        MASK_NAMES=mask_names,
         RIDEOPS_DATA_PATH=str(data_path) if data_path else None,
         DATABASE_URL="sqlite://",
         _env_file=None,

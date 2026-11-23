@@ -95,7 +95,7 @@ def precheck(
     try:
         result = run_precheck(
             TriageView.from_ticket(ticket),
-            body.evidence or {},
+            state.data.scrub_evidence(body.evidence) or {},
             state.data.knowledge,
             note=body.note,
         )
@@ -154,16 +154,17 @@ def record_decision(
     state: AppState = Depends(get_state),
 ) -> DecisionResponse:
     ticket = _find(state, ticket_id)
+    evidence = state.data.scrub_evidence(body.evidence)
     if ticket.priority == PRIORITY_P1:
         server_verdict = Verdict.READY_TO_ESCALATE
     else:
         try:
             server_verdict = run_precheck(
-                TriageView.from_ticket(ticket), body.evidence or {}, state.data.knowledge
+                TriageView.from_ticket(ticket), evidence or {}, state.data.knowledge
             ).verdict
         except UnknownEvidenceKeyError as exc:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
-    reason = body.override_reason or None
+    reason = state.data.scrub(body.override_reason) or None
     if override_reason_required(body.action, server_verdict, ticket.priority) and not reason:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -175,7 +176,7 @@ def record_decision(
         verdict_shown=body.verdict_shown.value if body.verdict_shown else None,
         server_verdict=server_verdict.value,
         override_reason=reason,
-        evidence=known_proofs(ticket.category, body.evidence),
-        agent=body.agent,
+        evidence=known_proofs(ticket.category, evidence),
+        agent=state.data.scrub(body.agent),
     )
     return DecisionResponse.model_validate(row)
