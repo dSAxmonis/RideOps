@@ -307,7 +307,7 @@ export function LivePanel({ data }: { data: LiveMetrics }) {
           value={data.decisions_total}
           note={`${data.by_action.escalated} escalated, ${data.by_action.resolved_at_l1} resolved, ${data.by_action.requested_info} info`}
         />
-        <Stat label="Overrides" value={data.overrides} note={`${rate(data.override_rate)} of decisions`} />
+        <Stat label="Overrides" value={data.overrides} note={`${rate(data.override_rate)} of held decisions`} />
         <Stat label="Escalations avoided" value={data.escalations_avoided} note="As recorded, not verified" />
       </div>
       <p
