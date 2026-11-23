@@ -105,7 +105,9 @@ def test_missing_evidence_then_ready(client):
 
 def test_unknown_evidence_key_rejected(client):
     response = client.post(
-        "/api/v1/tickets/T-R1/precheck", headers=HEADERS, json={"evidence": {"bogus": True}}
+        "/api/v1/tickets/T-R1/precheck",
+        headers=HEADERS,
+        json={"evidence": {"bogus": "some proof text"}},
     )
     assert response.status_code == 422
 
@@ -179,7 +181,9 @@ def test_decision_stores_client_and_server_verdicts(client):
     assert body["server_verdict"] == "likely_known_issue"
 
 
-@pytest.mark.parametrize("extra", [{}, {"evidence": None}, {"evidence": {"stale_key": True}}])
+@pytest.mark.parametrize(
+    "extra", [{}, {"evidence": None}, {"evidence": {"stale_key": "stale proof text"}}]
+)
 def test_null_verdict_on_p1_succeeds_without_reason(client, extra):
     response = decide(client, "T-P1", action="escalated", verdict_shown=None, **extra)
     assert response.status_code == 201
@@ -218,7 +222,7 @@ def test_decision_rejects_unknown_evidence_key(client):
         "T-R1",
         action="escalated",
         verdict_shown="ready_to_escalate",
-        evidence={"bogus": True},
+        evidence={"bogus": "some proof text"},
     )
     assert response.status_code == 422
 

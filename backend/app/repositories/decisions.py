@@ -1,6 +1,7 @@
+import json
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, create_engine
+from sqlalchemy import DateTime, Integer, String, Text, create_engine, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -19,8 +20,13 @@ class DecisionRow(Base):
     verdict_shown: Mapped[str | None] = mapped_column(String(32), nullable=True)
     server_verdict: Mapped[str] = mapped_column(String(32))
     override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidence_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     agent: Mapped[str] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    @property
+    def evidence(self) -> dict[str, str]:
+        return json.loads(self.evidence_json) if self.evidence_json else {}
 
 
 def build_engine(url: str) -> Engine:
@@ -39,6 +45,10 @@ class DecisionRepository:
 
     def create_schema(self) -> None:
         Base.metadata.create_all(self._engine)
+        columns = {column["name"] for column in inspect(self._engine).get_columns("decisions")}
+        if "evidence_json" not in columns:
+            with self._engine.begin() as connection:
+                connection.execute(text("ALTER TABLE decisions ADD COLUMN evidence_json TEXT"))
 
     def add(
         self,
@@ -49,6 +59,7 @@ class DecisionRepository:
         server_verdict: str,
         override_reason: str | None,
         agent: str,
+        evidence: dict[str, str] | None = None,
     ) -> DecisionRow:
         row = DecisionRow(
             ticket_id=ticket_id,
@@ -56,6 +67,7 @@ class DecisionRepository:
             verdict_shown=verdict_shown,
             server_verdict=server_verdict,
             override_reason=override_reason,
+            evidence_json=json.dumps(evidence) if evidence else None,
             agent=agent,
             created_at=datetime.now(UTC),
         )

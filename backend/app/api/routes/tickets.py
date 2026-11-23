@@ -23,7 +23,7 @@ from app.domain.schemas import (
     TicketList,
     TicketSummary,
 )
-from app.services.checklist import UnknownEvidenceKeyError
+from app.services.checklist import UnknownEvidenceKeyError, known_proofs
 from app.services.precheck import run_precheck
 
 router = APIRouter(prefix="/tickets", tags=["tickets"], dependencies=[Depends(require_access_code)])
@@ -93,7 +93,7 @@ def precheck(
     try:
         result = run_precheck(
             TriageView.from_ticket(ticket),
-            body.evidence,
+            body.evidence or {},
             state.data.knowledge,
             note=body.note,
         )
@@ -105,7 +105,14 @@ def precheck(
         confidence_band=result.confidence_band,
         reasons=result.reasons,
         checklist=[
-            ChecklistEntry(key=s.key, label=s.label, required=s.required, done=s.done)
+            ChecklistEntry(
+                key=s.key,
+                label=s.label,
+                required=s.required,
+                done=s.done,
+                proof=s.proof,
+                proof_hint=s.proof_hint,
+            )
             for s in result.checklist
         ],
         similar=[
@@ -155,6 +162,7 @@ def record_decision(
         verdict_shown=body.verdict_shown.value if body.verdict_shown else None,
         server_verdict=server_verdict.value,
         override_reason=reason,
+        evidence=known_proofs(ticket.category, body.evidence),
         agent=body.agent,
     )
     return DecisionResponse.model_validate(row)

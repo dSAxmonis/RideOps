@@ -3,10 +3,12 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
+from app.domain.checklists import MAX_PROOF_CHARS
 from app.domain.models import ConfidenceBand, DecisionAction, Verdict
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 LongText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
+ProofText = Annotated[str, StringConstraints(strict=True, max_length=MAX_PROOF_CHARS)]
 
 
 class TicketSummary(BaseModel):
@@ -43,7 +45,7 @@ class Ticket(TicketSummary):
 class PrecheckRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    evidence: dict[str, bool]
+    evidence: dict[str, ProofText] | None = None
     note: LongText | None = None
 
 
@@ -52,6 +54,8 @@ class ChecklistEntry(BaseModel):
     label: str
     required: bool
     done: bool
+    proof: str | None
+    proof_hint: str
 
 
 class SimilarTicket(BaseModel):
@@ -79,7 +83,7 @@ class DecisionRequest(BaseModel):
 
     action: DecisionAction
     verdict_shown: Verdict | None = None
-    evidence: dict[str, bool] | None = None
+    evidence: dict[str, ProofText] | None = None
     override_reason: LongText | None = None
     agent: ShortText
 
@@ -93,6 +97,7 @@ class DecisionResponse(BaseModel):
     verdict_shown: Verdict | None
     server_verdict: Verdict
     override_reason: str | None
+    evidence: dict[str, str]
     agent: str
     created_at: datetime
 

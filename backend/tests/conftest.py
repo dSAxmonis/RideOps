@@ -158,4 +158,4 @@ def client(data_path):
 
 
 def all_evidence(category):
-    return {item.key: True for item in CHECKLISTS[category]}
+    return {item.key: f"proof for {item.key}" for item in CHECKLISTS[category]}

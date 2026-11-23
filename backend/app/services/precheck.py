@@ -12,7 +12,13 @@ from app.domain.models import (
     TriageView,
     Verdict,
 )
-from app.services.checklist import ChecklistState, evaluate, items_for, missing_required
+from app.services.checklist import (
+    ChecklistState,
+    blank_state,
+    evaluate,
+    items_for,
+    missing_required,
+)
 from app.services.retrieval import KnowledgeBase, Match
 
 THIN_EVIDENCE_NOTE = (
@@ -187,16 +193,13 @@ _SUGGESTED_ACTIONS = {
 
 def run_precheck(
     view: TriageView,
-    evidence: dict[str, bool] | None,
+    evidence: dict[str, str] | None,
     knowledge: KnowledgeBase,
     policy: PrecheckPolicy = DEFAULT_POLICY,
     note: str | None = None,
 ) -> PrecheckResult:
     if evidence is None:
-        checklist = [
-            ChecklistState(item.key, item.label, item.required, False)
-            for item in items_for(view.category)
-        ]
+        checklist = [blank_state(item) for item in items_for(view.category)]
         missing_keys = None
         missing_states: list[ChecklistState] = []
     else:
