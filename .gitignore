@@ -25,3 +25,6 @@ __pycache__/
 .claude/
 .vercel/
 .DS_Store
+
+# Submission documents
+submission/
