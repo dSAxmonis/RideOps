@@ -32,6 +32,15 @@ const tickets = Array.from({ length: 36 }, (_, index) => ({
   assigned_agent: index % 7 === 6 ? null : AGENTS[index % 3],
   status: index > 29 ? "closed" : "open",
   escalated_to_eng: false,
+  client_id: `CL-${100 + (index % 6)}`,
+  first_response_at: null,
+  eng_ticket_id: null,
+  eng_handoffs: null,
+  eng_outcome: null,
+  first_closed_at: null,
+  final_closed_at: null,
+  reopen_count: null,
+  csat_score: null,
 }));
 
 const CHECKS = [
@@ -42,13 +51,17 @@ const CHECKS = [
 
 const decisions = [];
 
+function verdictFor(ticket, evidence) {
+  const missing = CHECKS.filter((check) => check.required && !evidence[check.key]);
+  if (missing.length > 0) return { verdict: "needs_info", missing };
+  const index = Number(ticket.ticket_id.slice(-2));
+  return { verdict: index % 4 === 1 ? "likely_known_issue" : "ready_to_escalate", missing };
+}
+
 function precheck(ticket, evidence) {
   const checklist = CHECKS.map((check) => ({ ...check, done: Boolean(evidence[check.key]) }));
-  const missing = checklist.filter((item) => item.required && !item.done);
+  const { verdict, missing } = verdictFor(ticket, evidence);
   const index = Number(ticket.ticket_id.slice(-2));
-  let verdict = "ready_to_escalate";
-  if (missing.length === 2) verdict = index % 2 ? "likely_known_issue" : "needs_info";
-  else if (missing.length === 1) verdict = "try_l1_fix";
   return {
     ticket_id: ticket.ticket_id,
     verdict,
@@ -66,7 +79,10 @@ function precheck(ticket, evidence) {
       similarity: 0.9 - offset * 0.11,
       closed_at: hoursAgo(200 + offset * 30),
     })),
-    suggested_action: verdict === "ready_to_escalate" ? "Escalate with the attached evidence" : "Complete the required evidence",
+    suggested_action:
+      verdict === "ready_to_escalate"
+        ? "Escalate with the attached evidence. Optional: try a quick config or how-to check at L1."
+        : "Complete the required evidence",
     override_allowed: true,
   };
 }
@@ -89,12 +105,27 @@ const weeks = Array.from({ length: 12 }, (_, index) => {
   };
 });
 
+const backtestRun = (delayed, flaggedKnown, extraFlag) => ({
+  window: { start: "2026-01-01 00:00:00", end: "2026-01-31 23:59:00" },
+  policy_version: "mock.v2",
+  escalations: 100,
+  flagged_by_verdict: { likely_known_issue: flaggedKnown, try_l1_fix: extraFlag, needs_info: 0, ready_to_escalate: 100 - flaggedKnown - extraFlag },
+  precision_by_verdict: {
+    likely_known_issue: { flagged: flaggedKnown, correct: 8, precision: 8 / flaggedKnown, base_rate: 0.2, lift: 8 / flaggedKnown / 0.2, target_outcomes: ["Sample outcome"] },
+    needs_info: { flagged: 0, correct: 0, precision: null, base_rate: 0.1, lift: null, target_outcomes: ["Sample outcome"] },
+  },
+  held_for_review: { count: flaggedKnown + extraFlag, avoidable: 12, precision_avoidable: 12 / (flaggedKnown + extraFlag), base_rate_avoidable: 0.5, recall_avoidable: 0.24 },
+  fixed_bugs_delayed: { count: delayed, fixed_total: 40, rate: delayed / 40, by_verdict: { likely_known_issue: delayed } },
+  p1: { total: 6, misses: 0 },
+  assumptions: ["Mock assumption: evidence is treated as complete in replay."],
+});
+
 const backtest = {
-  verdict_counts: { likely_known_issue: 214, try_l1_fix: 141, needs_info: 96, ready_to_escalate: 349 },
-  precision: 0.81,
-  true_bugs_delayed: 23,
-  p1_misses: 0,
-  sample_size: 800,
+  ...backtestRun(5, 20, 0),
+  result_label: "revised_not_clean_holdout",
+  clean_holdout: false,
+  methodology_note: "Mock note: the revision was informed by the evaluation window, so this is not a clean holdout.",
+  original_pre_change: { ...backtestRun(9, 20, 10), result_label: "original_pre_change", clean_holdout: false },
 };
 
 const send = (res, status, body) => {
@@ -155,9 +186,10 @@ createServer(async (req, res) => {
   if (req.method === "POST" && match[2] === "decisions") {
     const body = await readBody(req);
     if (!body?.action || !body.agent) return send(res, 422, { detail: "action and agent required" });
-    const against = body.action === "escalated" && body.verdict_shown !== "ready_to_escalate";
+    const serverVerdict = verdictFor(ticket, body.evidence ?? {}).verdict;
+    const against = body.action === "escalated" && serverVerdict !== "ready_to_escalate";
     if (against && ticket.priority !== "P1" && !body.override_reason?.trim()) {
-      return send(res, 422, { detail: "override_reason is required" });
+      return send(res, 422, { detail: "override_reason is required when escalating against this verdict" });
     }
     decisions.push({ ticket_id: ticket.ticket_id, ...body });
     console.log("decision", JSON.stringify(decisions.at(-1)));
