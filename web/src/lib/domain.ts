@@ -75,12 +75,17 @@ export const humanize = (value: string) => {
 };
 
 export const MIN_PROOF_CHARS = 8;
+export const MIN_PROOF_DISTINCT = 4;
 export const MAX_PROOF_CHARS = 300;
 
-/** Proof counts only with at least 8 non-space characters. */
+/** Proof needs 8 non-space characters and 4 different letters or digits. */
 export const proofChars = (value: string) => value.replace(/\s/g, "").length;
+export const proofDistinct = (value: string) =>
+  new Set(value.toLowerCase().match(/[\p{L}\p{N}]/gu) ?? []).size;
 export const isValidProof = (value: string) =>
-  proofChars(value) >= MIN_PROOF_CHARS && value.trim().length <= MAX_PROOF_CHARS;
+  proofChars(value) >= MIN_PROOF_CHARS &&
+  proofDistinct(value) >= MIN_PROOF_DISTINCT &&
+  value.trim().length <= MAX_PROOF_CHARS;
 
 /** Only valid proof is sent, so partial typing does not trigger a re-check. */
 export function validEvidence(drafts: Record<string, string>) {
