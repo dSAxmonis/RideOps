@@ -1,7 +1,7 @@
 export function PriorityBadge({ priority }: { priority: string }) {
   const style =
     priority === "P1"
-      ? "bg-accent text-accent-ink"
+      ? "bg-critical-soft text-critical-text"
       : priority === "P2"
         ? "bg-serious-soft text-serious-text"
         : "bg-raised text-ink-2";
