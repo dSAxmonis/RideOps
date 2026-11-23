@@ -17,3 +17,5 @@ services:
       # Free-tier disk is ephemeral. Set a postgresql:// URL to keep decisions across restarts.
       - key: DATABASE_URL
         value: sqlite:////tmp/rideops.db
+      - key: WARM_REPORTS
+        value: "true"
