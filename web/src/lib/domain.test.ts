@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRate, requiresOverrideReason, sortQueue, toPercentSeries } from "@/lib/domain";
+import { formatRate, isValidProof, validEvidence, requiresOverrideReason, sortQueue, toPercentSeries } from "@/lib/domain";
 
 describe("sortQueue", () => {
   it("sorts by priority, then oldest first", () => {
@@ -37,5 +37,18 @@ describe("toPercentSeries", () => {
   it("scales fractions and leaves percentage series alone", () => {
     expect(toPercentSeries([0.5, null])).toEqual([50, null]);
     expect(toPercentSeries([0.5, 12])).toEqual([0.5, 12]);
+  });
+});
+
+describe("proof", () => {
+  it("needs 8 non-space characters and at most 300", () => {
+    expect(isValidProof("a b c d e f g")).toBe(false);
+    expect(isValidProof("a b c d e f g h")).toBe(true);
+    expect(isValidProof("x".repeat(300))).toBe(true);
+    expect(isValidProof("x".repeat(301))).toBe(false);
+  });
+
+  it("sends only valid proof, trimmed", () => {
+    expect(validEvidence({ a: "short", b: "  long enough  " })).toEqual({ b: "long enough" });
   });
 });

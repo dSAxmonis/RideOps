@@ -13,6 +13,15 @@ describe("resolveProxyTarget", () => {
     );
   });
 
+  it("allows the burn-down endpoints", () => {
+    expect(resolveProxyTarget("GET", ["backlog", "burndown"], none)?.path).toBe("/backlog/burndown");
+    expect(resolveProxyTarget("GET", ["metrics", "live"], none)?.path).toBe("/metrics/live");
+    expect(resolveProxyTarget("GET", ["known-issues"], none)?.path).toBe("/known-issues");
+    expect(resolveProxyTarget("POST", ["backlog", "T-1", "actions"], none)?.path).toBe(
+      "/backlog/T-1/actions",
+    );
+  });
+
   it("keeps only known query parameters", () => {
     const search = new URLSearchParams("q=late&limit=5&admin=1");
     expect(resolveProxyTarget("GET", ["tickets"], search)?.query).toBe("?q=late&limit=5");
@@ -27,6 +36,10 @@ describe("resolveProxyTarget", () => {
     ["POST", ["tickets", "T-1", "delete"]],
     ["DELETE", ["tickets", "T-1"]],
     ["GET", ["metrics", "secret"]],
+    ["POST", ["backlog", "burndown"]],
+    ["GET", ["backlog", "T-1", "actions"]],
+    ["POST", ["backlog", "..", "actions"]],
+    ["POST", ["known-issues"]],
   ])("rejects %s %j", (method, segments) => {
     expect(resolveProxyTarget(method, segments, none)).toBeNull();
   });

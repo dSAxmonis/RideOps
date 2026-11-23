@@ -3,11 +3,11 @@
 import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
-import { fetchBacktest, fetchWeekly, isWakingError } from "@/lib/api";
-import type { Backtest, BacktestRun, WeekMetrics } from "@/lib/contract";
+import { fetchBacktest, fetchLiveMetrics, fetchWeekly, isWakingError } from "@/lib/api";
+import type { Backtest, BacktestRun, LiveMetrics, WeekMetrics } from "@/lib/contract";
 import { formatRate, humanize, toPercentSeries } from "@/lib/domain";
 import { Icon } from "@/components/Icon";
-import { EmptyNotice, QueryBoundary } from "@/components/QueryStates";
+import { EmptyNotice, LoadingRows, QueryBoundary } from "@/components/QueryStates";
 import type { TrendPoint } from "@/components/impact/TrendChart";
 
 const TrendChart = dynamic(() => import("@/components/impact/TrendChart"), {
@@ -296,7 +296,39 @@ export function BacktestResults({ data }: { data: Backtest }) {
 const BACKTEST_MAX_RETRIES = 40;
 const BACKTEST_RETRY_DELAY_MS = 3_000;
 
+export function LivePanel({ data }: { data: LiveMetrics }) {
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+        <Stat label="Open now" value={data.open_now} note={`${data.open_at_snapshot} at snapshot`} />
+        <Stat label="Cleared" value={data.cleared} note="Recorded in this tool" />
+        <Stat
+          label="Decisions"
+          value={data.decisions_total}
+          note={`${data.by_action.escalated} escalated, ${data.by_action.resolved_at_l1} resolved, ${data.by_action.requested_info} info`}
+        />
+        <Stat label="Overrides" value={data.overrides} note={`${rate(data.override_rate)} of decisions`} />
+        <Stat label="Escalations avoided" value={data.escalations_avoided} note="As recorded, not verified" />
+      </div>
+      <p
+        role="status"
+        className={`flex items-center gap-1.5 border-l-2 bg-surface px-3 py-1.5 text-[13px] ${data.durable ? "border-good" : "border-warning"}`}
+      >
+        <Icon name={data.durable ? "check" : "alert"} className={data.durable ? "text-good" : "text-warning"} />
+        {data.durable
+          ? `Storage is durable (${data.storage ?? "unknown"}).`
+          : `Storage is not durable (${data.storage ?? "unknown"}). This activity can reset when the server restarts.`}
+      </p>
+    </div>
+  );
+}
+
 export function ImpactView() {
+  const live = useQuery({
+    queryKey: ["metrics", "live"],
+    queryFn: ({ signal }) => fetchLiveMetrics(signal),
+    staleTime: 0,
+  });
   const weekly = useQuery({ queryKey: ["metrics", "weekly"], queryFn: ({ signal }) => fetchWeekly(signal) });
   const backtest = useQuery({
     queryKey: ["metrics", "backtest"],
@@ -311,6 +343,15 @@ export function ImpactView() {
         <h1 className="text-base font-semibold">Impact</h1>
         <p className="text-ink-2">Dashed segments are partial weeks and are left out of “last full week”.</p>
       </div>
+      <section aria-labelledby="live" className="space-y-2">
+        <div>
+          <h2 id="live" className="text-sm font-semibold">Live</h2>
+          <p className="text-ink-2">Activity since launch, not proven outcomes.</p>
+        </div>
+        <QueryBoundary query={live} loading={<LoadingRows rows={2} />}>
+          {(data) => <LivePanel data={data} />}
+        </QueryBoundary>
+      </section>
       <QueryBoundary query={weekly}>
         {({ weeks }) =>
           weeks.length === 0 ? (

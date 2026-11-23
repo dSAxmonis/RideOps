@@ -77,7 +77,7 @@ export function QueueRows({ tickets, now }: { tickets: TicketSummary[]; now: num
               <span className="font-mono text-xs text-ink-2">{ticket.ticket_id}</span>
               <span className="float-right text-ink-2 tabular-nums md:hidden">{formatAge(ticket.created_at, now)}</span>
               <span className="mt-1 block truncate md:mt-0">{ticket.description || "No description"}</span>
-              <span className="truncate text-xs text-ink-2 md:text-[13px]">
+              <span className="block truncate text-xs text-ink-2 md:text-[13px]">
                 {ticket.client_name ?? "n/a"}
                 {ticket.client_tier ? ` (${ticket.client_tier})` : ""}
                 <span className="md:hidden"> · {ticket.category ?? "n/a"}</span>
@@ -124,7 +124,7 @@ export function QueueView() {
       else next.delete(key);
     }
     const text = next.toString();
-    router.replace(text ? `/?${text}` : "/", { scroll: false });
+    router.replace(text ? `/queue?${text}` : "/queue", { scroll: false });
   };
 
   useEffect(() => {
@@ -134,7 +134,7 @@ export function QueueView() {
       if (draft) next.set("q", draft);
       else next.delete("q");
       const text = next.toString();
-      router.replace(text ? `/?${text}` : "/", { scroll: false });
+      router.replace(text ? `/queue?${text}` : "/queue", { scroll: false });
     }, 300);
     return () => clearTimeout(timer);
   }, [draft, urlQuery, router]);

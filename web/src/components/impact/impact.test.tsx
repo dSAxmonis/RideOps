@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Backtest, BacktestRun } from "@/lib/contract";
-import { BacktestResults } from "@/components/impact/ImpactView";
+import { BacktestResults, LivePanel } from "@/components/impact/ImpactView";
 import { toChartRows } from "@/components/impact/TrendChart";
 
 const run: BacktestRun = {
@@ -50,6 +50,25 @@ describe("BacktestResults", () => {
   it("renders without the original run", () => {
     render(<BacktestResults data={{ ...data, original_pre_change: null }} />);
     expect(screen.queryByRole("columnheader", { name: /Original replay/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("LivePanel", () => {
+  const live = {
+    open_at_snapshot: 10, open_now: 8, cleared: 2, decisions_total: 3,
+    by_action: { escalated: 1, resolved_at_l1: 1, requested_info: 1 },
+    overrides: 1, override_rate: 0.33, escalations_avoided: 1, by_lane_cleared: {}, by_day: [],
+    storage: "sqlite", durable: false,
+  };
+
+  it("warns when storage is not durable", () => {
+    render(<LivePanel data={live} />);
+    expect(screen.getByRole("status")).toHaveTextContent("not durable");
+  });
+
+  it("states durable storage", () => {
+    render(<LivePanel data={{ ...live, durable: true, storage: "postgres" }} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Storage is durable (postgres)");
   });
 });
 

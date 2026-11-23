@@ -73,3 +73,21 @@ export const humanize = (value: string) => {
   const text = value.replace(/_/g, " ").replace(/\bl1\b/gi, "L1");
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
+
+export const MIN_PROOF_CHARS = 8;
+export const MAX_PROOF_CHARS = 300;
+
+/** Proof counts only with at least 8 non-space characters. */
+export const proofChars = (value: string) => value.replace(/\s/g, "").length;
+export const isValidProof = (value: string) =>
+  proofChars(value) >= MIN_PROOF_CHARS && value.trim().length <= MAX_PROOF_CHARS;
+
+/** Only valid proof is sent, so partial typing does not trigger a re-check. */
+export function validEvidence(drafts: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(drafts)
+      .filter(([, value]) => isValidProof(value))
+      .map(([key, value]) => [key, value.trim()] as const)
+      .sort(([a], [b]) => a.localeCompare(b)),
+  );
+}

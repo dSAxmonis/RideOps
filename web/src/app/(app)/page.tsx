@@ -1,11 +1,5 @@
-import { Suspense } from "react";
-import { LoadingRows } from "@/components/QueryStates";
-import { QueueView } from "@/components/queue/QueueView";
+import { redirect } from "next/navigation";
 
-export default function QueuePage() {
-  return (
-    <Suspense fallback={<LoadingRows />}>
-      <QueueView />
-    </Suspense>
-  );
+export default function HomePage() {
+  redirect("/burndown");
 }
