@@ -1,14 +1,12 @@
-import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveProxyTarget } from "@/lib/server/allowlist";
-import { isSessionConfigured, openSession } from "@/lib/server/sealed";
 import {
-  SESSION_COOKIE,
   UPSTREAM_TIMEOUT_MS,
+  apiAccessCode,
   apiBaseUrl,
   isColdStartStatus,
   isSameOrigin,
-} from "@/lib/server/session";
+} from "@/lib/server/upstream";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -30,17 +28,9 @@ async function forward(request: NextRequest, context: RouteContext) {
     return errorResponse(403, "forbidden");
   }
 
-  if (!isSessionConfigured()) return errorResponse(500, "not_configured");
-
-  const accessCode = openSession((await cookies()).get(SESSION_COOKIE)?.value);
-  if (!accessCode) {
-    const response = errorResponse(401, "unauthorized");
-    response.cookies.delete(SESSION_COOKIE);
-    return response;
-  }
-
+  const accessCode = apiAccessCode();
   const baseUrl = apiBaseUrl();
-  if (!baseUrl) return errorResponse(500, "not_configured");
+  if (!accessCode || !baseUrl) return errorResponse(500, "not_configured");
 
   let body: string | undefined;
   if (request.method === "POST") {
@@ -74,9 +64,7 @@ async function forward(request: NextRequest, context: RouteContext) {
   }
 
   if (upstream.status === 401 || upstream.status === 403) {
-    const response = errorResponse(401, "unauthorized");
-    response.cookies.delete(SESSION_COOKIE);
-    return response;
+    return errorResponse(500, "not_configured");
   }
   if (isColdStartStatus(upstream.status)) return errorResponse(503, "upstream_unavailable");
 

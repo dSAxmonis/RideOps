@@ -69,9 +69,6 @@ async function request<S extends z.ZodType>(
 
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    if (response.status === 401 && typeof window !== "undefined") {
-      window.location.assign("/login");
-    }
     const code =
       typeof body === "object" && body !== null && "error" in body
         ? String((body as { error: unknown }).error)
