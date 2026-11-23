@@ -53,10 +53,6 @@ export function AppHeader() {
     { href: "/", label: "Queue", active: pathname === "/" || pathname.startsWith("/tickets") },
     { href: "/impact", label: "Impact", active: pathname.startsWith("/impact") },
   ];
-  const signOut = async () => {
-    await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
-    window.location.assign("/login");
-  };
 
   return (
     <header className="border-b border-line bg-surface">
@@ -78,9 +74,6 @@ export function AppHeader() {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <ThemeSelect />
-          <button type="button" onClick={signOut} className="rounded px-2 py-1 text-ink-2 hover:text-ink">
-            Sign out
-          </button>
         </div>
       </div>
     </header>

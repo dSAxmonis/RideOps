@@ -2,16 +2,8 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const cookieValue = vi.hoisted(() => ({ current: undefined as string | undefined }));
-
 vi.mock("server-only", () => ({}));
-vi.mock("next/headers", () => ({
-  cookies: async () => ({
-    get: () => (cookieValue.current ? { value: cookieValue.current } : undefined),
-  }),
-}));
 
-import { sealSession } from "@/lib/server/sealed";
 import { GET, POST } from "./route";
 
 const context = (...path: string[]) => ({ params: Promise.resolve({ path }) });
@@ -21,8 +13,7 @@ const json = (body: unknown, status = 200) =>
 describe("proxy route", () => {
   beforeEach(() => {
     vi.stubEnv("API_BASE_URL", "https://backend.test/");
-    vi.stubEnv("SESSION_SECRET", "unit-test-secret-unit-test-secret-000");
-    cookieValue.current = sealSession("test-code")!;
+    vi.stubEnv("ACCESS_CODE", "test-code");
   });
 
   it("forwards the code server-side to the versioned API", async () => {
@@ -47,24 +38,8 @@ describe("proxy route", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("returns 401 without a session", async () => {
-    cookieValue.current = undefined;
-    vi.stubGlobal("fetch", vi.fn());
-    const response = await GET(new NextRequest("http://app.test/api/proxy/health"), context("health"));
-    expect(response.status).toBe(401);
-  });
-
-  it("rejects a tampered session without calling upstream", async () => {
-    cookieValue.current = `${cookieValue.current}x`;
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    const response = await GET(new NextRequest("http://app.test/api/proxy/health"), context("health"));
-    expect(response.status).toBe(401);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("fails closed when the session secret is unset", async () => {
-    vi.stubEnv("SESSION_SECRET", "");
+  it("reports a missing server code as a configuration error", async () => {
+    vi.stubEnv("ACCESS_CODE", "");
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const response = await GET(new NextRequest("http://app.test/api/proxy/health"), context("health"));
@@ -94,10 +69,10 @@ describe("proxy route", () => {
     expect(await response.json()).toEqual({ error: "upstream_unavailable" });
   });
 
-  it("clears the session when the backend rejects the code", async () => {
+  it("reports a rejected server code as a configuration error", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({ detail: "no" }, 401)));
     const response = await GET(new NextRequest("http://app.test/api/proxy/health"), context("health"));
-    expect(response.status).toBe(401);
-    expect(response.headers.get("set-cookie")).toContain("rideops_session=;");
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "not_configured" });
   });
 });
