@@ -10,12 +10,12 @@ An internal tool that helps L1 support agents clear tickets that already have an
 - 52.1% of escalations (253 of 486) came back without an engineering fix.
 - The 7-day average of open tickets rose from 29.0 (25-31 Jul) to 49.9 (24-30 Sep). Intake rose about 40%, so this tool alone cannot restore July levels.
 - Scenario estimate for the check: 10-19% fewer open tickets. It has not been measured live.
-- September replay of 189 escalations: 25 held, 15 of them avoidable, 10 of 78 true bugs delayed, 0 of 9 P1s held. It is **not a clean holdout**, and the needs-info verdict could not be replayed.
+- September replay of 189 escalations: policy v2 held 25 and delayed 10 of 78 true bugs. Policy v3 makes history a warning, so it delays 0 of 78 by design and still flags the same 15 avoidable tickets, with 0 of 9 P1s held. It is **not a clean holdout**, and the missing-proof gate could not be replayed.
 
 ## Features
 
 - **Burn-down:** the 48 snapshot tickets in next-action lanes, with status mismatches flagged.
-- **Pre-escalation check:** written proof for each required step, an advisory verdict, and a logged override. P1 tickets are never held.
+- **Pre-escalation check:** written proof for each required step, an advisory verdict, and a logged override. `monitor` logs without gating. `enforce` asks for proof or a reason. P1 tickets are never held.
 - **Known issues and draft playbooks:** issues derived from repeated duplicates, plus category steps that still need team review.
 - **Impact:** live activity, weekly measures, guardrails and the replay.
 
@@ -63,6 +63,7 @@ Open <http://localhost:3000>.
 | API | `DATABASE_URL` | SQLite by default, or a `postgresql://` URL |
 | API | `MASK_NAMES` | `true` replaces names with `Client NNN` and `Agent A`-`H` |
 | API | `WARM_REPORTS` | `true` starts computing the backtest at startup |
+| API | `PRECHECK_MODE` | `monitor` (default) or `enforce` |
 | Web | `API_BASE_URL` | API base URL, without `/api/v1` |
 | Web | `ACCESS_CODE` | Same value as the API; used only by the server proxy |
 
@@ -84,6 +85,6 @@ cd web && npm test && npm run lint && npm run typecheck
 - **The demo database is temporary.** Render's free Postgres expires on 2026-12-23, after which recorded actions are lost unless migrated.
 - The verdict field has no timestamp and ticket status may lag it, so each of the 34 needs validation.
 - Clearing a ticket is recorded activity, not proof the client's issue is resolved.
-- Proof is checked for length only, so it can be gamed and needs sampling.
+- Proof is checked for length and character variety only, so plausible filler can still pass and needs sampling.
 - Masking is pseudonymous, not anonymous: labels follow sorted names and can be reversed with the source data.
 - The data is one 13-week snapshot. Engineering effort and queue time are not in it, so any hours saved are assumptions.

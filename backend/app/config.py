@@ -3,6 +3,8 @@ from datetime import datetime
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.domain.models import PrecheckMode
+
 SNAPSHOT_AT = datetime(2026, 9, 30, 23, 59)
 BASELINE_START = datetime(2026, 7, 19)
 BACKTEST_START = datetime(2026, 9, 1)
@@ -16,6 +18,9 @@ class Settings(BaseSettings):
     database_url: str = Field(default="sqlite:///./rideops.db", validation_alias="DATABASE_URL")
     warm_reports: bool = Field(default=False, validation_alias="WARM_REPORTS")
     mask_names: bool = Field(default=False, validation_alias="MASK_NAMES")
+    precheck_mode: PrecheckMode = Field(
+        default=PrecheckMode.MONITOR, validation_alias="PRECHECK_MODE"
+    )
 
     @field_validator("database_url")
     @classmethod

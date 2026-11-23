@@ -35,6 +35,7 @@ function failureMessage(error: unknown) {
 export function DecisionBar({
   priority,
   verdict,
+  gated,
   evidence,
   checking = false,
   submitting,
@@ -44,6 +45,8 @@ export function DecisionBar({
 }: {
   priority: string;
   verdict: Verdict | null;
+  /** From the server's mode and missing proof. Undefined when talking to an older API. */
+  gated?: boolean;
   evidence: Evidence;
   /** The verdict is being recomputed, so a reason requirement may be about to change. */
   checking?: boolean;
@@ -61,7 +64,7 @@ export function DecisionBar({
   const fastPath = isP1(priority);
   const serverNeedsReason = serverRequired !== null && serverRequired.verdict === verdict;
   const reasonRequired = (action: DecisionAction) =>
-    requiresOverrideReason(action, verdict, priority) || (action === "escalated" && serverNeedsReason);
+    requiresOverrideReason(action, verdict, priority, gated) || (action === "escalated" && serverNeedsReason);
 
   if (recorded) {
     return (

@@ -166,6 +166,7 @@ function Stat({
 
 const RESULT_LABELS: Record<string, string> = {
   revised_not_clean_holdout: "Revised policy: not a clean holdout",
+  history_hold_v2: "v2: history could hold",
   original_pre_change: "Original replay, before the revision",
 };
 
@@ -189,6 +190,8 @@ const COMPARISON: { label: string; value: (run: BacktestRun) => string }[] = [
   { label: "Known-issue precision", value: (run) => rate(run.precision_by_verdict[KNOWN_ISSUE]?.precision) },
   { label: "Known-issue base rate", value: (run) => rate(run.precision_by_verdict[KNOWN_ISSUE]?.base_rate) },
   { label: "Known-issue lift", value: (run) => lift(run.precision_by_verdict[KNOWN_ISSUE]?.lift) },
+  { label: "Advisory flags", value: (run) => plain(run.advisory_flags?.count) },
+  { label: "Avoidable among flags", value: (run) => plain(run.advisory_flags?.avoidable) },
   { label: "Held for review", value: (run) => plain(run.held_for_review?.count) },
   { label: "Avoidable caught", value: (run) => plain(run.held_for_review?.avoidable) },
   { label: "Share of avoidable caught", value: (run) => rate(run.held_for_review?.recall_avoidable) },
@@ -204,6 +207,9 @@ export function BacktestResults({ data }: { data: Backtest }) {
   const delayed = data.fixed_bugs_delayed;
   const runs: { heading: string; run: BacktestRun }[] = [
     { heading: resultLabel(data.result_label), run: data },
+    ...(data.history_hold_v2
+      ? [{ heading: resultLabel(data.history_hold_v2.result_label), run: data.history_hold_v2 }]
+      : []),
     ...(original ? [{ heading: resultLabel(original.result_label), run: original }] : []),
   ];
   const verdictKeys = [...new Set(runs.flatMap(({ run }) => Object.keys(run.flagged_by_verdict)))];
@@ -240,9 +246,17 @@ export function BacktestResults({ data }: { data: Backtest }) {
           note={`${lift(knownIssue?.lift)} lift over a ${rate(knownIssue?.base_rate)} base rate.`}
         />
         <Stat
-          label="Avoidable caught"
-          value={ofTotal(data.held_for_review?.avoidable, data.held_for_review?.count)}
-          note={`Of tickets held. ${rate(data.held_for_review?.recall_avoidable)} of all avoidable escalations.`}
+          label={data.advisory_flags ? "Avoidable among flags" : "Avoidable caught"}
+          value={
+            data.advisory_flags
+              ? ofTotal(data.advisory_flags.avoidable, data.advisory_flags.count)
+              : ofTotal(data.held_for_review?.avoidable, data.held_for_review?.count)
+          }
+          note={
+            data.advisory_flags
+              ? "Shown as warnings. None of these tickets is delayed."
+              : `Of tickets held. ${rate(data.held_for_review?.recall_avoidable)} of all avoidable escalations.`
+          }
         />
       </div>
 
@@ -307,7 +321,7 @@ export function LivePanel({ data }: { data: LiveMetrics }) {
           value={data.decisions_total}
           note={`${data.by_action.escalated} escalated, ${data.by_action.resolved_at_l1} resolved, ${data.by_action.requested_info} info`}
         />
-        <Stat label="Overrides" value={data.overrides} note={`${rate(data.override_rate)} of held decisions`} />
+        <Stat label="Overrides" value={data.overrides} note={`${rate(data.override_rate)} of flagged decisions`} />
         <Stat label="Escalations avoided" value={data.escalations_avoided} note="As recorded, not verified" />
       </div>
       <p

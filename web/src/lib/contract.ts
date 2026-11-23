@@ -105,6 +105,8 @@ export const precheckResponseSchema = z.object({
   similar: z.array(similarTicketSchema),
   suggested_action: z.string().nullish().transform((value) => value ?? ""),
   override_allowed: z.literal(true),
+  mode: z.enum(["monitor", "enforce"]).optional(),
+  escalation_gated: z.boolean().optional(),
   known_issue: knownIssueMatchSchema.nullish().transform((value) => value ?? null),
   playbook: playbookSchema.nullish().transform((value) => value ?? null),
 });
@@ -172,6 +174,9 @@ const backtestRunSchema = z.looseObject({
       recall_avoidable: nullableNumber,
     })
     .nullish(),
+  advisory_flags: z
+    .looseObject({ count: z.number(), avoidable: z.number(), true_bugs_flagged: z.number() })
+    .nullish(),
   fixed_bugs_delayed: z
     .looseObject({
       count: z.number(),
@@ -190,6 +195,7 @@ export type BacktestRun = z.infer<typeof backtestRunSchema>;
 
 export const backtestSchema = backtestRunSchema.extend({
   methodology_note: z.string().min(1),
+  history_hold_v2: backtestRunSchema.nullish(),
   original_pre_change: backtestRunSchema.nullish(),
 });
 export type Backtest = z.infer<typeof backtestSchema>;

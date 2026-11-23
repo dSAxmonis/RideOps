@@ -98,6 +98,7 @@ def precheck(
             state.data.scrub_evidence(body.evidence) or {},
             state.data.knowledge,
             note=body.note,
+            mode=state.settings.precheck_mode,
         )
     except UnknownEvidenceKeyError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
@@ -140,6 +141,8 @@ def precheck(
             else None
         ),
         playbook=PlaybookView(title=result.playbook.title, steps=list(result.playbook.steps)),
+        mode=result.mode,
+        escalation_gated=result.escalation_gated,
     )
 
 
@@ -155,17 +158,23 @@ def record_decision(
 ) -> DecisionResponse:
     ticket = _find(state, ticket_id)
     evidence = state.data.scrub_evidence(body.evidence)
+    gated = False
     if ticket.priority == PRIORITY_P1:
         server_verdict = Verdict.READY_TO_ESCALATE
     else:
         try:
-            server_verdict = run_precheck(
-                TriageView.from_ticket(ticket), evidence or {}, state.data.knowledge
-            ).verdict
+            result = run_precheck(
+                TriageView.from_ticket(ticket),
+                evidence or {},
+                state.data.knowledge,
+                mode=state.settings.precheck_mode,
+            )
         except UnknownEvidenceKeyError as exc:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+        server_verdict = result.verdict
+        gated = result.escalation_gated
     reason = state.data.scrub(body.override_reason) or None
-    if override_reason_required(body.action, server_verdict, ticket.priority) and not reason:
+    if override_reason_required(body.action, gated) and not reason:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "override_reason is required when escalating against this verdict",

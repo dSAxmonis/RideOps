@@ -19,3 +19,5 @@ services:
         value: sqlite:////tmp/rideops.db
       - key: WARM_REPORTS
         value: "true"
+      - key: PRECHECK_MODE
+        value: monitor
