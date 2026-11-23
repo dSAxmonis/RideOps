@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 CHECKLIST_VERSION = "2026-11.v2"
 MIN_PROOF_CHARS = 8
+MIN_PROOF_DISTINCT = 4
 MAX_PROOF_CHARS = 300
 
 

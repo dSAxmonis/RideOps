@@ -1,6 +1,11 @@
 from dataclasses import dataclass
 
-from app.domain.checklists import CHECKLISTS, MIN_PROOF_CHARS, ChecklistItem
+from app.domain.checklists import (
+    CHECKLISTS,
+    MIN_PROOF_CHARS,
+    MIN_PROOF_DISTINCT,
+    ChecklistItem,
+)
 
 
 class UnknownEvidenceKeyError(ValueError):
@@ -24,7 +29,10 @@ def items_for(category: str) -> tuple[ChecklistItem, ...]:
 
 
 def is_valid_proof(proof: str | None) -> bool:
-    return proof is not None and len("".join(proof.split())) >= MIN_PROOF_CHARS
+    if proof is None or len("".join(proof.split())) < MIN_PROOF_CHARS:
+        return False
+    distinct = {char for char in proof.casefold() if char.isalnum()}
+    return len(distinct) >= MIN_PROOF_DISTINCT
 
 
 def blank_state(item: ChecklistItem) -> ChecklistState:

@@ -89,7 +89,8 @@ function proofStatus(item: ChecklistItem) {
   if (item.done) return "Done";
   const count = proofChars(item.proof);
   if (count === 0) return item.required ? "Required" : "Optional";
-  return `${MIN_PROOF_CHARS - count > 0 ? MIN_PROOF_CHARS - count : 0} more characters`;
+  if (count < MIN_PROOF_CHARS) return `${MIN_PROOF_CHARS - count} more characters`;
+  return "Add real detail";
 }
 
 function Checklist({
@@ -105,7 +106,7 @@ function Checklist({
     <section aria-label="Evidence checklist" className="bg-surface px-3 py-2">
       <h3 className={sectionTitle}>Evidence{fastPath ? " (optional)" : ""}</h3>
       <p className="mb-1 text-xs text-ink-2">
-        Add a short proof for each item. It counts from {MIN_PROOF_CHARS} characters.
+        Add a short, specific proof for each item, at least {MIN_PROOF_CHARS} characters.
       </p>
       {items.length === 0 ? <p className="text-ink-2">No evidence needed for this ticket.</p> : null}
       <ul className="space-y-2">
