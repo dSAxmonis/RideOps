@@ -24,7 +24,7 @@ describe("proxy route", () => {
   });
 
   it("forwards the code server-side to the versioned API", async () => {
-    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) => json({ items: [], total: 0 }));
+    const fetchMock = vi.fn<typeof fetch>(async () => json({ items: [], total: 0 }));
     vi.stubGlobal("fetch", fetchMock);
     const response = await GET(
       new NextRequest("http://app.test/api/proxy/tickets?q=x&evil=1"),
